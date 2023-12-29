@@ -1,0 +1,26 @@
+defaults:
+  - _self_
+  - task: enzyme_class
+
+seed: 1234
+model: esm2_t6_8M_UR50D
+datapath: datasets
+split: structure
+nogpu: false
+budget: 600
+solver: flaml
+
+truncation_seq_length: 5000
+toks_per_batch: 4096
+
+logs:
+  prefix: logs_esm
+  path: ${logs.prefix}/${task.name}/${solver}/${model}/${split}/${seed}
+
+# output directory, generated dynamically on each run
+hydra:
+  run:
+    dir: ${logs.path}
+  sweep:
+    dir: ${logs.prefix}/${task.name}/${solver}/${model}/${split}/${seed}
+    subdir: ""

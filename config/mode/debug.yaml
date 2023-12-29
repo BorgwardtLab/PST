@@ -1,0 +1,23 @@
+# @package _global_
+
+debug: true
+
+logs:
+  prefix: logs_debug
+
+data:
+  organism: escherichia_coli
+
+compute:
+  accelerator: cpu
+  precision: 32
+  strategy: auto
+  n_jobs: 1
+
+training:
+  epochs: 10
+  lr: 0.0003
+  weight_decay: 0.0
+  batch_size: 4
+  warmup: 1
+  num_workers: 0

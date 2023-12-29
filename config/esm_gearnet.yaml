@@ -1,0 +1,42 @@
+defaults:
+  - _self_
+  - dataset: gearnet_ec
+
+task:
+  class: MultipleBinaryClassification
+  model:
+    output_dim: 0
+  graph_construction_model:
+    class: GraphConstruction
+    node_layers:
+      - class: AlphaCarbonNode
+    edge_layers:
+      - class: SequentialEdge
+  criterion: bce
+  num_mlp_layer: 0
+  metric: ['auprc@micro', 'f1_max']
+
+seed: 1234
+model: esm2_t6_8M_UR50D
+datapath: datasets
+nogpu: false
+budget: 60
+solver: sklearn_cv
+metric: 'f1_max'
+
+truncation_seq_length: 5000
+toks_per_batch: 4096
+aggr: null
+use_pca: null
+
+logs:
+  prefix: logs_esm/gearnet
+  path: ${logs.prefix}/${dataset.name}/${solver}/${model}/${aggr}/${seed}
+
+# output directory, generated dynamically on each run
+hydra:
+  run:
+    dir: ${logs.path}
+  sweep:
+    dir: ${logs.prefix}/${dataset.name}/${solver}/${model}/${aggr}/${seed}
+    subdir: ""

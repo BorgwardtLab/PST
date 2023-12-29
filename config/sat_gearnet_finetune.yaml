@@ -1,0 +1,57 @@
+defaults:
+  - _self_
+  - dataset: gearnet_ec
+  - training: gearnet_finetune
+  - mode: default
+
+task:
+  class: MultipleBinaryClassification
+  model:
+    output_dim: 0
+  graph_construction_model:
+    class: GraphConstruction
+    node_layers:
+      - class: AlphaCarbonNode
+    edge_layers:
+      - class: SequentialEdge
+  criterion: bce
+  num_mlp_layer: 0
+  metric: ['auprc@micro', 'f1_max']
+
+debug: false
+seed: 1234
+model: esm2_t6_8M_UR50D
+use_edge_attr: false
+datapath: datasets
+metric: 'f1_max'
+device: null
+
+truncation_seq_length: 2000
+toks_per_batch: 4096
+include_seq: false
+out_head: linear
+aggr: null
+num_iterations: null
+
+compute:
+  accelerator: gpu
+  precision: 16-mixed
+  strategy: auto
+  num_workers: 8
+  n_jobs: 10
+
+pretrained:
+  prefix: pretrained/${model}
+  name: model.pt
+
+logs:
+  prefix: logs_proteinshake/gearnet/finetune
+  path: ${logs.prefix}/${dataset.name}/${model}/${out_head}/${aggr}/${include_seq}/${seed}
+
+# output directory, generated dynamically on each run
+hydra:
+  run:
+    dir: ${logs.path}
+  sweep:
+    dir: ${logs.prefix}/${dataset.name}/${model}/${out_head}/${include_seq}/${seed}
+    subdir: ""

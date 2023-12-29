@@ -1,0 +1,9 @@
+class: EnzymeCommission
+path: ${datapath}/gearnet/EC
+test_cutoff: 0.95
+atom_feature: null
+bond_feature: null
+transform:
+  class: ProteinView
+  view: residue
+name: EnzymeCommission
