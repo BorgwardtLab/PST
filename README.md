@@ -27,14 +27,7 @@ Below you can see a typical setup of PST with the [SAT][3]-based structure extra
 
 ### A quick-start example
 
-Below you can find a quick-start example [TODO], see `./TODO.py` for more details.
-
-<details><summary>click to see the example:</summary>
-
-```python
-import torch
-```
-</details>
+Below you can find the script where we train PST variants, see `./train_pst.py` for more details.
 
 ## Installation
 
