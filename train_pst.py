@@ -123,7 +123,7 @@ def main(cfg):
         ],
         callbacks=[
             pl.callbacks.LearningRateMonitor(logging_interval="epoch"),
-            pl.callbacks.TQDMProgressBar(refresh_rate=100),
+            pl.callbacks.RichProgressBar(),
         ],
     )
 
