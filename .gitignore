@@ -1,5 +1,6 @@
 ### Custom Directories ###
 logs/
+logs_esm/
 data/
 data
 datasets/
