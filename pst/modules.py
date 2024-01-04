@@ -5,8 +5,12 @@ from torch import nn
 
 from .gnn_layers import EDGE_GNN_TYPES, get_simple_gnn_layer
 from .rotary_embedding import RotaryEmbedding
-from .utils import (from_nested_tensor, to_dense_batch, to_nested_tensor,
-                    unpad_dense_batch)
+from .utils import (
+    from_nested_tensor,
+    to_dense_batch,
+    to_nested_tensor,
+    unpad_dense_batch,
+)
 
 
 class MultiheadAttention(nn.Module):

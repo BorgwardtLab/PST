@@ -1,30 +1,30 @@
 import logging
 from functools import partial
 
-import hydra
 import proteinshake.datasets as ps_dataset
 import pytorch_lightning as pl
 import torch
 from omegaconf import OmegaConf
-from protein_rep_learning.dataset import CustomGraphDataset
-from protein_rep_learning.utils import get_graph_from_ps_protein
 from proteinshake import datasets
 from proteinshake.transforms import Compose
-from pyprojroot import here
 from torch_geometric.loader import DataLoader
 
-from pst.esm2 import ESM2SAT
+from pst.dataset import CustomGraphDataset
+from pst.esm2 import PST
 from pst.trainer import BertTrainer
-from pst.transforms import (MaskNode, PretrainingAttr, Proteinshake2ESM,
-                            RandomCrop, get_val_dataset)
+from pst.transforms import (
+    MaskNode,
+    PretrainingAttr,
+    Proteinshake2ESM,
+    RandomCrop,
+    get_val_dataset,
+)
+from pst.utils import get_graph_from_ps_protein
 
 log = logging.getLogger(__name__)
 
 
-@hydra.main(
-    version_base="1.3", config_path=str(here() / "config"), config_name="config"
-)
-def main(cfg):
+def test_train_esm2sat(cfg):
     log.info(f"Configs:\n{OmegaConf.to_yaml(cfg)}")
     pl.seed_everything(cfg.seed, workers=True)
     if cfg.model.use_edge_attr:
@@ -48,7 +48,8 @@ def main(cfg):
         cfg.model.edge_dim = 16
     else:
         dataset = datasets.AlphaFoldDataset(
-            root=cfg.data.datapath, organism=cfg.data.organism
+            root=cfg.data.datapath,
+            organism=cfg.data.organism,
         )
         dataset = dataset.to_graph(eps=cfg.data.graph_eps).pyg(
             transform=Compose(
@@ -83,7 +84,7 @@ def main(cfg):
         num_workers=cfg.training.num_workers,
     )
 
-    net = ESM2SAT.from_model_name(
+    net = PST.from_model_name(
         cfg.model.name,
         k_hop=cfg.model.k_hop,
         gnn_type=cfg.model.gnn_type,
@@ -104,7 +105,9 @@ def main(cfg):
 
     trainer = pl.Trainer(
         limit_train_batches=5 if cfg.debug else None,
-        val_check_interval=1000 / (len(train_loader) // num_devices),
+        limit_val_batches=5 if cfg.debug else None,
+        check_val_every_n_epoch=1,
+        val_check_interval=2,
         max_epochs=cfg.training.epochs,
         precision=cfg.compute.precision,
         accelerator=cfg.compute.accelerator,
@@ -124,7 +127,3 @@ def main(cfg):
     trainer.fit(model, train_loader, val_loader)
 
     net.save(f"{cfg.logs.path}/model.pt", cfg)
-
-
-if __name__ == "__main__":
-    main()

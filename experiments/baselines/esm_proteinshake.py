@@ -6,12 +6,11 @@ import hydra
 import numpy as np
 import pandas as pd
 import torch
+from data_utils import compute_metrics, get_task, prepare_data
 from esm import FastaBatchedDataset, pretrained
 from omegaconf import OmegaConf
 from pyprojroot import here
 from tqdm import tqdm
-
-from data_utils import compute_metrics, get_task, prepare_data
 
 log = logging.getLogger(__name__)
 
@@ -138,10 +137,9 @@ def main(cfg):
     elif cfg.solver == "sklearn_cv":
         import copy
 
+        from data_utils.sklearn_utils import SklearnPredictor
         from sklearn.metrics import make_scorer
         from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
-        from data_utils.sklearn_utils import SklearnPredictor
 
         estimator = SklearnPredictor(task.task_out)
 
@@ -182,7 +180,6 @@ def main(cfg):
         import copy
 
         from cyanure import preprocess
-
         from data_utils.cyanure_utils import CyanurePredictor
 
         if cfg.task.name != "structure_similarity":

@@ -22,7 +22,7 @@ from torch_geometric.utils import from_scipy_sparse_matrix
 from torchdrug import core
 from tqdm import tqdm
 
-from pst.esm2 import ESM2SAT
+from pst.esm2 import PST
 
 log = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ def main(cfg):
         else:
             pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
 
-    model, model_cfg = ESM2SAT.from_pretrained(pretrained_path)
+    model, model_cfg = PST.from_pretrained(pretrained_path)
     model.eval()
     model.to(cfg.device)
 
@@ -235,9 +235,8 @@ def main(cfg):
     scoring = make_scorer(scorer, needs_threshold=True)
 
     if cfg.solver == "sklearn_cv":
-        from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
         from data_utils.sklearn_utils import SklearnPredictor
+        from sklearn.model_selection import GridSearchCV, PredefinedSplit
 
         estimator = SklearnPredictor("multi_label")
 

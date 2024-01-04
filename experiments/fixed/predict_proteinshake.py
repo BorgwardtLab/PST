@@ -8,14 +8,14 @@ import numpy as np
 import pandas as pd
 import torch
 import torch_geometric.nn as gnn
+from data_utils import compute_metrics, get_task, prepare_data
 from omegaconf import OmegaConf
 from proteinshake.transforms import Compose
 from pyprojroot import here
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
-from data_utils import compute_metrics, get_task, prepare_data
-from pst.esm2 import ESM2SAT
+from pst.esm2 import PST
 from pst.transforms import PretrainingAttr, Proteinshake2ESM
 
 log = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ def main(cfg):
         else:
             pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
 
-    model, model_cfg = ESM2SAT.from_pretrained(pretrained_path)
+    model, model_cfg = PST.from_pretrained(pretrained_path)
     model.eval()
     model.to(cfg.device)
 
@@ -91,8 +91,8 @@ def main(cfg):
     else:
         from functools import partial
 
-        from protein_rep_learning.dataset import CustomGraphDataset
-        from protein_rep_learning.utils import get_graph_from_ps_protein
+        from pst.dataset import CustomGraphDataset
+        from pst.utils import get_graph_from_ps_protein
 
         featurizer_fn = partial(
             get_graph_from_ps_protein, use_rbfs=True, eps=model_cfg.data.graph_eps
@@ -183,10 +183,9 @@ def main(cfg):
     elif cfg.solver == "sklearn_cv":
         import copy
 
+        from data_utils.sklearn_utils import SklearnPredictor
         from sklearn.metrics import make_scorer
         from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
-        from data_utils.sklearn_utils import SklearnPredictor
 
         estimator = SklearnPredictor(task.task_out)
 
@@ -227,7 +226,6 @@ def main(cfg):
         import copy
 
         from cyanure import preprocess
-
         from data_utils.cyanure_utils import CyanurePredictor
 
         if cfg.task.name != "structure_similarity":

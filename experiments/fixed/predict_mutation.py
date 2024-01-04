@@ -7,12 +7,12 @@ from timeit import default_timer as timer
 import pandas as pd
 import scipy
 import torch
+from data_utils.mutation import DeepSequenceDataset
 from proteinshake.utils import residue_alphabet
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
-from data_utils.mutation import DeepSequenceDataset
-from pst.esm2 import ESM2SAT
+from pst.esm2 import PST
 from pst.transforms import MutationDataset
 
 
@@ -130,7 +130,7 @@ def main():
     dataset = dataset_cls(root=cfg.datapath)
     mutations_list = dataset.mutations
 
-    model, model_cfg = ESM2SAT.from_pretrained(
+    model, model_cfg = PST.from_pretrained(
         Path(cfg.pretrained_prefix) / cfg.pretrained_name
     )
     model.eval()

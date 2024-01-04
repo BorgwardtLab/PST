@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import argparse
+
 # from Bio import SeqIO
 import itertools
 import json
@@ -14,10 +15,9 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 import torch
+from data_utils.mutation import DeepSequenceDataset
 from esm import Alphabet, FastaBatchedDataset, ProteinBertModel, pretrained
 from tqdm import tqdm
-
-from data_utils.mutation import DeepSequenceDataset
 
 
 def remove_insertions(sequence: str) -> str:

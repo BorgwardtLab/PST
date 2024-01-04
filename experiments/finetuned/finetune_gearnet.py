@@ -20,7 +20,7 @@ from torch_geometric.utils import from_scipy_sparse_matrix
 from torchdrug import core
 from tqdm import tqdm
 
-from pst.esm2 import ESM2SAT, ProteinNet
+from pst.esm2 import PST, ProteinNet
 from pst.utils import get_linear_schedule_with_warmup
 
 log = logging.getLogger(__name__)
@@ -213,7 +213,7 @@ def main(cfg):
         else:
             pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
 
-    model, model_cfg = ESM2SAT.from_pretrained(pretrained_path)
+    model, model_cfg = PST.from_pretrained(pretrained_path)
 
     task = core.Configurable.load_config_dict(
         edict(OmegaConf.to_container(cfg.task, resolve=True))

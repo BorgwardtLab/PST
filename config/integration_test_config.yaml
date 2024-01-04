@@ -1,9 +1,9 @@
 defaults:
   - _self_
-  - training: default
+  - training: debug
   - mode: default
 
-debug: false
+debug: true
 seed: 1234
   
 data:
@@ -22,13 +22,13 @@ compute:
   n_jobs: 10
 
 logs:
-  prefix: logs
+  prefix: logs/test_logs/
   path: ${logs.prefix}/${model.name}/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
   
 model:
   name: "esm2_t6_8M_UR50D"
   k_hop: 2
-  train_struct_only: true
+  train_struct_only: false
   use_edge_attr: true
   gnn_type: gine
   edge_dim: null

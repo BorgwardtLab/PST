@@ -2,8 +2,10 @@ import pytorch_lightning as pl
 import torch
 from torch import nn
 
-from .utils import (get_cosine_schedule_with_warmup,
-                    get_inverse_sqrt_schedule_with_warmup)
+from .utils import (
+    get_cosine_schedule_with_warmup,
+    get_inverse_sqrt_schedule_with_warmup,
+)
 
 
 class BertTrainer(pl.LightningModule):

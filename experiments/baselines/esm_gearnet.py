@@ -1,4 +1,3 @@
-import copy
 import json
 import logging
 from pathlib import Path
@@ -7,19 +6,18 @@ from timeit import default_timer as timer
 import hydra
 import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 import torchdrug
+
 # from data_utils import get_task, compute_metrics, prepare_data
 from easydict import EasyDict as edict
 from esm import FastaBatchedDataset, pretrained
 from omegaconf import OmegaConf
 from pyprojroot import here
+
 # from torchdrug.data import DataLoader
 from sklearn.metrics import make_scorer
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
-from torchdrug import core, datasets, models, tasks
+from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
 log = logging.getLogger(__name__)
@@ -98,7 +96,7 @@ def main(cfg):
         edict(OmegaConf.to_container(cfg.task, resolve=True))
     )
 
-    sequence_path = Path(cfg.dataset.path) / f"sequences.pt"
+    sequence_path = Path(cfg.dataset.path) / "sequences.pt"
     if sequence_path.exists():
         tmp = torch.load(sequence_path)
         train_seq, y_tr = tmp["train_seq"], tmp["y_tr"]
@@ -169,9 +167,8 @@ def main(cfg):
     scoring = make_scorer(scorer, needs_threshold=True)
 
     if cfg.solver == "flaml":
-        from flaml import AutoML
-
         from data_utils.sklearn_utils import MyMultiOutputClassifier
+        from flaml import AutoML
 
         clf = AutoML()
         # def custom_metric(
@@ -199,9 +196,8 @@ def main(cfg):
         clf.fit(X_tr, y_tr, X_val=X_val, y_val=y_val, **settings)
         clf_time = clf.best_config_train_time
     elif cfg.solver == "sklearn_cv":
-        from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
         from data_utils.sklearn_utils import SklearnPredictor
+        from sklearn.model_selection import GridSearchCV, PredefinedSplit
 
         estimator = SklearnPredictor("multi_label")
 

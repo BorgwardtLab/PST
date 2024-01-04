@@ -2,11 +2,12 @@ from functools import partial
 
 import esm
 import torch
-from protein_rep_learning.dataset import CustomGraphDataset
-from protein_rep_learning.utils import get_graph_from_ps_protein
 from proteinshake.utils import residue_alphabet
 from torch_geometric import utils
 from torch_geometric.data import Data
+
+from pst.dataset import CustomGraphDataset
+from pst.utils import get_graph_from_ps_protein
 
 esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
 
@@ -150,7 +151,7 @@ def get_val_dataset(
     use_edge_attr=False,
     n_jobs=1,
 ):
-    from data_utils.mutation import DeepSequenceDataset
+    from pst.data.mutation import DeepSequenceDataset
 
     protein_ids = DeepSequenceDataset.available_ids()
     protein_index = protein_ids.index(protein_id)

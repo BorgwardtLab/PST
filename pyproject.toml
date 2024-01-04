@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pst"
+authors = [
+    {name = "Philip Hartout", email = "hartout@biochem.mpg.de"},
+]
+description = "Protein Structure Transformer"
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["protein", "structure", "transformer"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "hydra-core",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+py-modules = []
+
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]

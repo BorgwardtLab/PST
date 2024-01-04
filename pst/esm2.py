@@ -5,7 +5,7 @@ from torch import nn
 from .modules import RobertaLMHead, TransformerLayer
 
 
-class ESM2SAT(nn.Module):
+class PST(nn.Module):
     def __init__(
         self,
         embed_dim=320,
