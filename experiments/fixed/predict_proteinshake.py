@@ -8,13 +8,13 @@ import numpy as np
 import pandas as pd
 import torch
 import torch_geometric.nn as gnn
-from data_utils import compute_metrics, get_task, prepare_data
 from omegaconf import OmegaConf
 from proteinshake.transforms import Compose
 from pyprojroot import here
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
+from pst.data import compute_metrics, get_task, prepare_data
 from pst.esm2 import PST
 from pst.transforms import PretrainingAttr, Proteinshake2ESM
 
@@ -153,7 +153,7 @@ def main(cfg):
     elif cfg.solver == "sklearn":
         import copy
 
-        from data_utils.sklearn_utils import SklearnPredictor
+        from pst.data.sklearn_utils import SklearnPredictor
 
         clf = SklearnPredictor(task.task_out)
 
@@ -183,9 +183,10 @@ def main(cfg):
     elif cfg.solver == "sklearn_cv":
         import copy
 
-        from data_utils.sklearn_utils import SklearnPredictor
         from sklearn.metrics import make_scorer
         from sklearn.model_selection import GridSearchCV, PredefinedSplit
+
+        from pst.data.sklearn_utils import SklearnPredictor
 
         estimator = SklearnPredictor(task.task_out)
 
@@ -226,7 +227,8 @@ def main(cfg):
         import copy
 
         from cyanure import preprocess
-        from data_utils.cyanure_utils import CyanurePredictor
+
+        from pst.data.cyanure_utils import CyanurePredictor
 
         if cfg.task.name != "structure_similarity":
             preprocess(X_tr, normalize=True, columns=False)

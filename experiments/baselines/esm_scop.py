@@ -1,20 +1,13 @@
-import copy
-import json
 import logging
 from pathlib import Path
 from timeit import default_timer as timer
 
 import hydra
-import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 from esm import FastaBatchedDataset, pretrained
 from omegaconf import OmegaConf
 from pyprojroot import here
-from sklearn.metrics import make_scorer
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 log = logging.getLogger(__name__)
@@ -149,7 +142,7 @@ def main(cfg):
         X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).long()
         X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).long()
         X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).long()
-        from data_utils.mlp_utils import train_and_eval_linear
+        from pst.data.mlp_utils import train_and_eval_linear
 
         val_score, test_score, test_stratified_score = train_and_eval_linear(
             X_tr,

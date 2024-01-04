@@ -800,8 +800,8 @@ def read_txt_file_line_by_line(filename: str) -> List[str]:
 
 def replace_obsolete_pdb_ids(split_data):
     split = split_data["split"].unique()[0]
-    obs_path = f"./data_utils/{split}_obsolete.csv"
-    if Path(f"./data_utils/{split}_obsolete.csv").exists():
+    obs_path = f"./.cache/{split}_obsolete.csv"
+    if Path(f"./.cache/{split}_obsolete.csv").exists():
         obsolete = pd.read_csv(obs_path)
         mapping = dict(zip(obsolete["obsolete"], obsolete["superseding"]))
         withdrawn_id = ["5JM5"]
@@ -824,7 +824,7 @@ def replace_obsolete_pdb_ids(split_data):
 
 def remove_ca_only_pdbs(split_data):
     split = split_data["split"].unique()[0]
-    ca_only_path = f"data_utils/{split}_ca_only_pdbs.txt"
+    ca_only_path = f".cache/{split}_ca_only_pdbs.txt"
     if Path(ca_only_path).exists():
         ca_only_pdbs = read_txt_file_line_by_line(ca_only_path)
         split_data = split_data[~split_data["pdb_id"].isin(ca_only_pdbs)]
@@ -835,7 +835,7 @@ def remove_ca_only_pdbs(split_data):
 
 def remove_unmappable(split_data):
     split = split_data["split"].unique()[0]
-    path = f"data_utils/{split}_unmappable.txt"
+    path = f".cache/{split}_unmappable.txt"
     if Path(path).exists():
         unmappable = read_txt_file_line_by_line(path)
         split_data = split_data[~split_data["pdb_id"].isin(unmappable)]

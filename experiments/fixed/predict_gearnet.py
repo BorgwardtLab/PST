@@ -235,8 +235,9 @@ def main(cfg):
     scoring = make_scorer(scorer, needs_threshold=True)
 
     if cfg.solver == "sklearn_cv":
-        from data_utils.sklearn_utils import SklearnPredictor
         from sklearn.model_selection import GridSearchCV, PredefinedSplit
+
+        from pst.data.sklearn_utils import SklearnPredictor
 
         estimator = SklearnPredictor("multi_label")
 
@@ -270,7 +271,7 @@ def main(cfg):
         X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).float()
         X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).float()
         X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).float()
-        from data_utils.mlp_utils import train_and_eval_mlp
+        from pst.data.mlp_utils import train_and_eval_mlp
 
         train_and_eval_mlp(
             X_tr,
@@ -286,7 +287,7 @@ def main(cfg):
         )
         return
     elif cfg.solver == "chainensemble":
-        from data_utils.sklearn_utils import LinearSVCChainEnsemble
+        from pst.data.sklearn_utils import LinearSVCChainEnsemble
 
         clf = LinearSVCChainEnsemble(100, scoring)
 

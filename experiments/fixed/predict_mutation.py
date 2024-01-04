@@ -7,11 +7,11 @@ from timeit import default_timer as timer
 import pandas as pd
 import scipy
 import torch
-from data_utils.mutation import DeepSequenceDataset
 from proteinshake.utils import residue_alphabet
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
+from pst.data.mutation import DeepSequenceDataset
 from pst.esm2 import PST
 from pst.transforms import MutationDataset
 
