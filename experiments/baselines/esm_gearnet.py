@@ -18,6 +18,8 @@ from sklearn.metrics import make_scorer
 from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
+from pst.data.sklearn_utils import SklearnPredictor
+
 log = logging.getLogger(__name__)
 
 
@@ -196,8 +198,6 @@ def main(cfg):
         clf_time = clf.best_config_train_time
     elif cfg.solver == "sklearn_cv":
         from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
-        from pst.data.sklearn_utils import SklearnPredictor
 
         estimator = SklearnPredictor("multi_label")
 

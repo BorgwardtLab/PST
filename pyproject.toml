@@ -9,7 +9,7 @@ authors = [
 ]
 description = "Protein Structure Transformer"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 keywords = ["protein", "structure", "transformer"]
 license = {text = "BSD-3-Clause"}
 classifiers = [
@@ -17,6 +17,18 @@ classifiers = [
 ]
 dependencies = [
     "hydra-core",
+    "pytest",
+    "proteinshake", 
+    "isort", 
+    "black", 
+    "fair-esm", 
+    "pyprojroot", 
+    "einops", 
+    "torch_geometric==2.3.1", 
+    "pandas", 
+    "easydict", 
+    "pyprojroot", 
+    "scikit-learn"
 ]
 dynamic = ["version"]
 
