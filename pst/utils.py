@@ -1,20 +1,30 @@
+import argparse
 import contextlib
 import json
+import logging
 import math
+import os
 import pickle
+import time
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
+import easydict
 import esm
+import jinja2
 import joblib
-import numpy as np
 import torch
-import torch.nn.functional as F
+import yaml
 from fastavro import reader as avro_reader
+from jinja2 import meta
 from joblib import Parallel, delayed
 from sklearn.neighbors import radius_neighbors_graph
 from torch import Tensor
+from torch import distributed as dist
+from torch.optim import lr_scheduler
 from torch_geometric.data import Data
 from torch_scatter import scatter
+from torchdrug import core, utils
+from torchdrug.utils import comm
 from tqdm import tqdm
 
 AA_THREE_TO_ONE = {
@@ -42,6 +52,188 @@ AA_THREE_TO_ONE = {
 }
 
 esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
+
+
+logger = logging.getLogger(__file__)
+
+
+def get_root_logger(file=True):
+    logger = logging.getLogger("")
+    logger.setLevel(logging.INFO)
+    format = logging.Formatter("%(asctime)-10s %(message)s", "%H:%M:%S")
+
+    if file:
+        handler = logging.FileHandler("log.txt")
+        handler.setFormatter(format)
+        logger.addHandler(handler)
+
+    return logger
+
+
+def create_working_directory(cfg):
+    file_name = "working_dir.tmp"
+    world_size = comm.get_world_size()
+    if world_size > 1 and not dist.is_initialized():
+        comm.init_process_group("nccl", init_method="env://")
+
+    working_dir = os.path.join(
+        os.path.expanduser(cfg.output_dir),
+        cfg.task["class"],
+        cfg.dataset["class"],
+        cfg.task.model["class"],
+        time.strftime("%Y-%m-%d-%H-%M-%S"),
+    )
+
+    # synchronize working directory
+    if comm.get_rank() == 0:
+        with open(file_name, "w") as fout:
+            fout.write(working_dir)
+        os.makedirs(working_dir)
+    comm.synchronize()
+    if comm.get_rank() != 0:
+        with open(file_name, "r") as fin:
+            working_dir = fin.read()
+    comm.synchronize()
+    if comm.get_rank() == 0:
+        os.remove(file_name)
+
+    os.chdir(working_dir)
+    return working_dir
+
+
+def detect_variables(cfg_file):
+    with open(cfg_file, "r") as fin:
+        raw = fin.read()
+    env = jinja2.Environment()
+    ast = env.parse(raw)
+    vars = meta.find_undeclared_variables(ast)
+    return vars
+
+
+def load_config(cfg_file, context=None):
+    with open(cfg_file, "r") as fin:
+        raw = fin.read()
+    template = jinja2.Template(raw)
+    instance = template.render(context)
+    cfg = yaml.safe_load(instance)
+    cfg = easydict.EasyDict(cfg)
+    return cfg
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", help="yaml configuration file", required=True)
+    parser.add_argument(
+        "-s", "--seed", help="random seed for PyTorch", type=int, default=1024
+    )
+
+    args, unparsed = parser.parse_known_args()
+    # get dynamic arguments defined in the config file
+    vars = detect_variables(args.config)
+    parser = argparse.ArgumentParser()
+    for var in vars:
+        parser.add_argument("--%s" % var, default="null")
+    vars = parser.parse_known_args(unparsed)[0]
+    vars = {k: utils.literal_eval(v) for k, v in vars._get_kwargs()}
+
+    return args, vars
+
+
+def build_downstream_solver(cfg, dataset):
+    train_set, valid_set, test_set = dataset.split()
+    if comm.get_rank() == 0:
+        logger.warning(dataset)
+        logger.warning(
+            "#train: %d, #valid: %d, #test: %d"
+            % (len(train_set), len(valid_set), len(test_set))
+        )
+
+    if cfg.task["class"] == "MultipleBinaryClassification":
+        cfg.task.task = [_ for _ in range(len(dataset.tasks))]
+    else:
+        cfg.task.task = dataset.tasks
+    task = core.Configurable.load_config_dict(cfg.task)
+
+    cfg.optimizer.params = task.parameters()
+    optimizer = core.Configurable.load_config_dict(cfg.optimizer)
+
+    if "scheduler" not in cfg:
+        scheduler = None
+    elif cfg.scheduler["class"] == "ReduceLROnPlateau":
+        cfg.scheduler.pop("class")
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, **cfg.scheduler)
+    else:
+        cfg.scheduler.optimizer = optimizer
+        scheduler = core.Configurable.load_config_dict(cfg.scheduler)
+        cfg.engine.scheduler = scheduler
+
+    solver = core.Engine(task, train_set, valid_set, test_set, optimizer, **cfg.engine)
+
+    if "lr_ratio" in cfg:
+        cfg.optimizer.params = [
+            {
+                "params": solver.model.model.parameters(),
+                "lr": cfg.optimizer.lr * cfg.lr_ratio,
+            },
+            {"params": solver.model.mlp.parameters(), "lr": cfg.optimizer.lr},
+        ]
+        optimizer = core.Configurable.load_config_dict(cfg.optimizer)
+        solver.optimizer = optimizer
+    elif "sequence_model_lr_ratio" in cfg:
+        assert cfg.task.model["class"] == "FusionNetwork"
+        cfg.optimizer.params = [
+            {
+                "params": solver.model.model.sequence_model.parameters(),
+                "lr": cfg.optimizer.lr * cfg.sequence_model_lr_ratio,
+            },
+            {
+                "params": solver.model.model.structure_model.parameters(),
+                "lr": cfg.optimizer.lr,
+            },
+            {"params": solver.model.mlp.parameters(), "lr": cfg.optimizer.lr},
+        ]
+        optimizer = core.Configurable.load_config_dict(cfg.optimizer)
+        solver.optimizer = optimizer
+
+    if isinstance(scheduler, lr_scheduler.ReduceLROnPlateau):
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, **cfg.scheduler)
+    elif scheduler is not None:
+        cfg.scheduler.optimizer = optimizer
+        scheduler = core.Configurable.load_config_dict(cfg.scheduler)
+        solver.scheduler = scheduler
+
+    if cfg.get("checkpoint") is not None:
+        solver.load(cfg.checkpoint)
+
+    if cfg.get("model_checkpoint") is not None:
+        if comm.get_rank() == 0:
+            logger.warning("Load checkpoint from %s" % cfg.model_checkpoint)
+        cfg.model_checkpoint = os.path.expanduser(cfg.model_checkpoint)
+        model_dict = torch.load(cfg.model_checkpoint, map_location=torch.device("cpu"))
+        task.model.load_state_dict(model_dict)
+
+    return solver, scheduler
+
+
+def build_pretrain_solver(cfg, dataset):
+    if comm.get_rank() == 0:
+        logger.warning(dataset)
+        logger.warning("#dataset: %d" % (len(dataset)))
+
+    task = core.Configurable.load_config_dict(cfg.task)
+    if "fix_sequence_model" in cfg:
+        if cfg.task["class"] == "Unsupervised":
+            model_dict = cfg.task.model.model
+        else:
+            model_dict = cfg.task.model
+        assert model_dict["class"] == "FusionNetwork"
+        for p in task.model.model.sequence_model.parameters():
+            p.requires_grad = False
+    cfg.optimizer.params = [p for p in task.parameters() if p.requires_grad]
+    optimizer = core.Configurable.load_config_dict(cfg.optimizer)
+    solver = core.Engine(task, dataset, None, None, optimizer, **cfg.engine)
+
+    return solver
 
 
 def to_dense_batch(x, ptr, return_mask=False, fill_value=0.0):
@@ -281,440 +473,6 @@ def load_obj(name):
         return pickle.load(f)
 
 
-def prepare(batch, shuffle_fraction=0.0):
-    """Pack and pad batch into torch tensors"""
-    alphabet = "ACDEFGHIKLMNPQRSTVWXY"
-    B = len(batch)
-    np.array([len(b["seq"]) for b in batch], dtype=np.int32)
-    L_max = max([len(b["seq"]) for b in batch])
-    X = np.zeros([B, L_max, 4, 3])
-    S = np.zeros([B, L_max], dtype=np.int32)
-
-    # Build the batch
-    for i, b in enumerate(batch):
-        x = np.stack([b[c] for c in ["N", "CA", "C", "O"]], 1)  # [#atom, 4, 3]
-
-        l = len(b["seq"])
-        x_pad = np.pad(
-            x, [[0, L_max - l], [0, 0], [0, 0]], "constant", constant_values=(np.nan,)
-        )  # [#atom, 4, 3]
-        X[i, :, :, :] = x_pad
-
-        # Convert to labels
-        indices = np.asarray([alphabet.index(a) for a in b["seq"]], dtype=np.int32)
-        S[i, :l] = indices
-
-    mask = np.isfinite(np.sum(X, (2, 3))).astype(np.float32)  # atom mask
-    numbers = np.sum(mask, axis=1).astype(np.int32)
-    S_new = np.zeros_like(S)
-    X_new = np.zeros_like(X) + np.nan
-    for i, n in enumerate(numbers):
-        X_new[i, :n, ::] = X[i][mask[i] == 1]
-        S_new[i, :n] = S[i][mask[i] == 1]
-
-    X = X_new
-    S = S_new
-    isnan = np.isnan(X)
-    mask = np.isfinite(np.sum(X, (2, 3))).astype(np.float32)
-    X[isnan] = 0.0
-    # Conversion
-    X = torch.from_numpy(X).to(dtype=torch.float32)
-    S = torch.from_numpy(S).to(dtype=torch.int64)
-    mask = torch.from_numpy(mask).to(dtype=torch.float32)
-    return X, S, mask
-
-
-def featurize_backbone(
-    X,
-    S,
-    mask,
-    top_k=30,
-    num_rbf=16,
-    node_dist=True,
-    node_angle=True,
-    node_direct=True,
-    edge_dist=True,
-    edge_angle=True,
-    edge_direct=True,
-):
-    device = X.device
-    mask_bool = mask == 1
-    B, N, _, _ = X.shape
-    X_ca = X[:, :, 1, :]
-    D_neighbors, E_idx = _full_dist(X_ca, mask, top_k)
-
-    mask_attend = gather_nodes(mask.unsqueeze(-1), E_idx).squeeze(-1)
-    mask_attend = (mask.unsqueeze(-1) * mask_attend) == 1
-
-    def edge_mask_select(x):
-        return torch.masked_select(x, mask_attend.unsqueeze(-1)).reshape(
-            -1, x.shape[-1]
-        )
-
-    def node_mask_select(x):
-        return torch.masked_select(x, mask_bool.unsqueeze(-1)).reshape(-1, x.shape[-1])
-
-    randn = torch.rand(mask.shape, device=X.device) + 5
-    decoding_order = torch.argsort(-mask * (torch.abs(randn)))
-    mask_size = mask.shape[1]
-    permutation_matrix_reverse = torch.nn.functional.one_hot(
-        decoding_order, num_classes=mask_size
-    ).float()
-    order_mask_backward = torch.einsum(
-        "ij, biq, bjp->bqp",
-        (1 - torch.triu(torch.ones(mask_size, mask_size, device=device))),
-        permutation_matrix_reverse,
-        permutation_matrix_reverse,
-    )
-    mask_attend2 = torch.gather(order_mask_backward, 2, E_idx)
-    mask_1D = mask.view([mask.size(0), mask.size(1), 1])
-    mask_bw = (mask_1D * mask_attend2).unsqueeze(-1)
-    mask_fw = (mask_1D * (1 - mask_attend2)).unsqueeze(-1)
-    mask_bw = edge_mask_select(mask_bw).squeeze()
-    mask_fw = edge_mask_select(mask_fw).squeeze()
-
-    # sequence
-    S = torch.masked_select(S, mask_bool)
-
-    # angle & direction
-    V_angles = _dihedrals(X, 0)
-    V_angles = node_mask_select(V_angles)
-
-    V_direct, E_direct, E_angles = _orientations_coarse_gl_tuple(X, E_idx)
-    V_direct = node_mask_select(V_direct)
-    E_direct = edge_mask_select(E_direct)
-    E_angles = edge_mask_select(E_angles)
-
-    # distance
-    atom_N = X[:, :, 0, :]
-    atom_Ca = X[:, :, 1, :]
-    atom_C = X[:, :, 2, :]
-    atom_O = X[:, :, 3, :]  # noqa
-    b = atom_Ca - atom_N
-    c = atom_C - atom_Ca
-    torch.cross(b, c, dim=-1)
-
-    node_list = ["Ca-N", "Ca-C", "Ca-O", "N-C", "N-O", "O-C"]
-    node_dist = []
-    for pair in node_list:
-        atom1, atom2 = pair.split("-")
-        node_dist.append(
-            node_mask_select(
-                _get_rbf(
-                    vars()["atom_" + atom1], vars()["atom_" + atom2], None, num_rbf
-                ).squeeze()
-            )
-        )
-
-    V_dist = torch.cat(tuple(node_dist), dim=-1).squeeze()
-
-    pair_lst = [
-        "Ca-Ca",
-        "Ca-C",
-        "C-Ca",
-        "Ca-N",
-        "N-Ca",
-        "Ca-O",
-        "O-Ca",
-        "C-C",
-        "C-N",
-        "N-C",
-        "C-O",
-        "O-C",
-        "N-N",
-        "N-O",
-        "O-N",
-        "O-O",
-    ]
-
-    edge_dist = []  # Ca-Ca
-    for pair in pair_lst:
-        atom1, atom2 = pair.split("-")
-        rbf = _get_rbf(vars()["atom_" + atom1], vars()["atom_" + atom2], E_idx, num_rbf)
-        edge_dist.append(edge_mask_select(rbf))
-
-    E_dist = torch.cat(tuple(edge_dist), dim=-1)
-
-    h_V = []
-    if node_dist:
-        h_V.append(V_dist)
-    if node_angle:
-        h_V.append(V_angles)
-    if node_direct:
-        h_V.append(V_direct)
-
-    h_E = []
-    if edge_dist:
-        h_E.append(E_dist)
-    if edge_angle:
-        h_E.append(E_angles)
-    if edge_direct:
-        h_E.append(E_direct)
-
-    _V = torch.cat(h_V, dim=-1)
-    _E = torch.cat(h_E, dim=-1)
-
-    # edge index
-    shift = mask.sum(dim=1).cumsum(dim=0) - mask.sum(dim=1)
-    src = shift.view(B, 1, 1) + E_idx
-    src = torch.masked_select(src, mask_attend).view(1, -1)
-    dst = shift.view(B, 1, 1) + torch.arange(0, N, device=src.device).view(
-        1, -1, 1
-    ).expand_as(mask_attend)
-    dst = torch.masked_select(dst, mask_attend).view(1, -1)
-    E_idx = torch.cat((dst, src), dim=0).long()
-
-    decoding_order = (
-        node_mask_select((decoding_order + shift.view(-1, 1)).unsqueeze(-1))
-        .squeeze()
-        .long()
-    )
-
-    # 3D point
-    sparse_idx = mask.nonzero()  # index of non-zero values
-    X = X[sparse_idx[:, 0], sparse_idx[:, 1], :, :]
-    batch_id = sparse_idx[:, 0]
-
-    return X, S, _V, _E, E_idx, batch_id
-
-
-def _full_dist(X, mask, top_k=30, eps=1e-6):
-    mask_2D = torch.unsqueeze(mask, 1) * torch.unsqueeze(mask, 2)
-    dX = torch.unsqueeze(X, 1) - torch.unsqueeze(X, 2)
-    D = (1.0 - mask_2D) * 10000 + mask_2D * torch.sqrt(torch.sum(dX**2, 3) + eps)
-    D_max, _ = torch.max(D, -1, keepdim=True)
-    D_adjust = D + (1.0 - mask_2D) * (D_max + 1)
-    D_neighbors, E_idx = torch.topk(
-        D_adjust, min(top_k, D_adjust.shape[-1]), dim=-1, largest=False
-    )
-    return D_neighbors, E_idx
-
-
-def nan_to_num(tensor, nan=0.0):
-    idx = torch.isnan(tensor)
-    tensor[idx] = nan
-    return tensor
-
-
-def _normalize(tensor, dim=-1):
-    return nan_to_num(torch.div(tensor, torch.norm(tensor, dim=dim, keepdim=True)))
-
-
-def cal_dihedral(X, eps=1e-7):
-    dX = X[:, 1:, :] - X[:, :-1, :]  # CA-N, C-CA, N-C, CA-N...
-    U = _normalize(dX, dim=-1)
-    u_0 = U[:, :-2, :]  # CA-N, C-CA, N-C,...
-    u_1 = U[
-        :, 1:-1, :
-    ]  # C-CA, N-C, CA-N, ... 0, psi_{i}, omega_{i}, phi_{i+1} or 0, tau_{i},...
-    u_2 = U[:, 2:, :]  # N-C, CA-N, C-CA, ...
-
-    n_0 = _normalize(torch.cross(u_0, u_1), dim=-1)
-    n_1 = _normalize(torch.cross(u_1, u_2), dim=-1)
-
-    cosD = (n_0 * n_1).sum(-1)
-    cosD = torch.clamp(cosD, -1 + eps, 1 - eps)
-
-    v = _normalize(torch.cross(n_0, n_1), dim=-1)
-    D = torch.sign((-v * u_1).sum(-1)) * torch.acos(cosD)  # TODO: sign
-
-    return D
-
-
-def _dihedrals(X, dihedral_type=0, eps=1e-7):
-    B, N, _, _ = X.shape
-    # psi, omega, phi
-    X = X[:, :, :3, :].reshape(X.shape[0], 3 * X.shape[1], 3)  # ['N', 'CA', 'C', 'O']
-    D = cal_dihedral(X)
-    D = F.pad(D, (1, 2), "constant", 0)
-    D = D.view((D.size(0), int(D.size(1) / 3), 3))
-    Dihedral_Angle_features = torch.cat((torch.cos(D), torch.sin(D)), 2)
-
-    # alpha, beta, gamma
-    dX = X[:, 1:, :] - X[:, :-1, :]  # CA-N, C-CA, N-C, CA-N...
-    U = _normalize(dX, dim=-1)
-    u_0 = U[:, :-2, :]  # CA-N, C-CA, N-C,...
-    u_1 = U[:, 1:-1, :]  # C-CA, N-C, CA-N, ...
-    cosD = (u_0 * u_1).sum(-1)  # alpha_{i}, gamma_{i}, beta_{i+1}
-    cosD = torch.clamp(cosD, -1 + eps, 1 - eps)
-    D = torch.acos(cosD)
-    D = F.pad(D, (1, 2), "constant", 0)
-    D = D.view((D.size(0), int(D.size(1) / 3), 3))
-    Angle_features = torch.cat((torch.cos(D), torch.sin(D)), 2)
-
-    D_features = torch.cat((Dihedral_Angle_features, Angle_features), 2)
-    return D_features
-
-
-def _hbonds(X, E_idx, mask_neighbors, eps=1e-3):
-    X_atoms = dict(zip(["N", "CA", "C", "O"], torch.unbind(X, 2)))
-
-    X_atoms["C_prev"] = F.pad(X_atoms["C"][:, 1:, :], (0, 0, 0, 1), "constant", 0)
-    X_atoms["H"] = X_atoms["N"] + _normalize(
-        _normalize(X_atoms["N"] - X_atoms["C_prev"], -1)
-        + _normalize(X_atoms["N"] - X_atoms["CA"], -1),
-        -1,
-    )
-
-    def _distance(X_a, X_b):
-        return torch.norm(X_a[:, None, :, :] - X_b[:, :, None, :], dim=-1)
-
-    def _inv_distance(X_a, X_b):
-        return 1.0 / (_distance(X_a, X_b) + eps)
-
-    U = (0.084 * 332) * (
-        _inv_distance(X_atoms["O"], X_atoms["N"])
-        + _inv_distance(X_atoms["C"], X_atoms["H"])
-        - _inv_distance(X_atoms["O"], X_atoms["H"])
-        - _inv_distance(X_atoms["C"], X_atoms["N"])
-    )
-
-    HB = (U < -0.5).type(torch.float32)
-    neighbor_HB = mask_neighbors * gather_edges(HB.unsqueeze(-1), E_idx)
-    return neighbor_HB
-
-
-def rbf(D, num_rbf):
-    D_min, D_max, D_count = 0.0, 20.0, num_rbf
-    D_mu = torch.linspace(D_min, D_max, D_count).to(D.device)
-    D_mu = D_mu.view([1, 1, 1, -1])
-    D_sigma = (D_max - D_min) / D_count
-    D_expand = torch.unsqueeze(D, -1)
-    RBF = torch.exp(-(((D_expand - D_mu) / D_sigma) ** 2))
-    return RBF
-
-
-def _get_rbf(A, B, E_idx=None, num_rbf=16):
-    if E_idx is not None:
-        D_A_B = torch.sqrt(
-            torch.sum((A[:, :, None, :] - B[:, None, :, :]) ** 2, -1) + 1e-6
-        )
-        D_A_B_neighbors = gather_edges(D_A_B[:, :, :, None], E_idx)[:, :, :, 0]
-        RBF_A_B = rbf(D_A_B_neighbors, num_rbf)
-    else:
-        D_A_B = torch.sqrt(
-            torch.sum((A[:, :, None, :] - B[:, :, None, :]) ** 2, -1) + 1e-6
-        )
-        RBF_A_B = rbf(D_A_B, num_rbf)
-    return RBF_A_B
-
-
-def _orientations_coarse_gl(X, E_idx, eps=1e-6):
-    X = X[:, :, :3, :].reshape(X.shape[0], 3 * X.shape[1], 3)
-    dX = X[:, 1:, :] - X[:, :-1, :]
-    U = _normalize(dX, dim=-1)
-    u_0, u_1 = U[:, :-2, :], U[:, 1:-1, :]
-    n_0 = _normalize(torch.cross(u_0, u_1), dim=-1)
-    b_1 = _normalize(u_0 - u_1, dim=-1)
-
-    n_0 = n_0[:, ::3, :]
-    b_1 = b_1[:, ::3, :]
-    X = X[:, ::3, :]
-
-    O = torch.stack((b_1, n_0, torch.cross(b_1, n_0)), 2)
-    O = O.view(list(O.shape[:2]) + [9])
-    O = F.pad(O, (0, 0, 0, 1), "constant", 0)
-
-    O_neighbors = gather_nodes(O, E_idx)
-    X_neighbors = gather_nodes(X, E_idx)
-
-    O = O.view(list(O.shape[:2]) + [3, 3]).unsqueeze(2)
-    O_neighbors = O_neighbors.view(list(O_neighbors.shape[:3]) + [3, 3])
-
-    dX = X_neighbors - X.unsqueeze(-2)
-    dU = torch.matmul(O, dX.unsqueeze(-1)).squeeze(-1)
-    R = torch.matmul(O.transpose(-1, -2), O_neighbors)
-    feat = torch.cat((_normalize(dU, dim=-1), _quaternions(R)), dim=-1)
-    return feat
-
-
-def _orientations_coarse_gl_tuple(X, E_idx, eps=1e-6):
-    V = X.clone()
-    X = X[:, :, :3, :].reshape(X.shape[0], 3 * X.shape[1], 3)
-    dX = X[:, 1:, :] - X[:, :-1, :]  # CA-N, C-CA, N-C, CA-N...
-    U = _normalize(dX, dim=-1)
-    u_0, u_1 = U[:, :-2, :], U[:, 1:-1, :]
-    n_0 = _normalize(torch.cross(u_0, u_1), dim=-1)
-    b_1 = _normalize(u_0 - u_1, dim=-1)
-
-    n_0 = n_0[:, ::3, :]
-    b_1 = b_1[:, ::3, :]
-    X = X[:, ::3, :]
-    Q = torch.stack((b_1, n_0, torch.cross(b_1, n_0)), 2)
-    Q = Q.view(list(Q.shape[:2]) + [9])
-    Q = F.pad(Q, (0, 0, 0, 1), "constant", 0)  # [16, 464, 9]
-
-    Q_neighbors = gather_nodes(Q, E_idx)  # [16, 464, 30, 9]
-    X_neighbors = gather_nodes(V[:, :, 1, :], E_idx)  # [16, 464, 30, 3]
-    N_neighbors = gather_nodes(V[:, :, 0, :], E_idx)
-    C_neighbors = gather_nodes(V[:, :, 2, :], E_idx)
-    O_neighbors = gather_nodes(V[:, :, 3, :], E_idx)
-
-    Q = Q.view(list(Q.shape[:2]) + [3, 3]).unsqueeze(2)  # [16, 464, 1, 3, 3]
-    Q_neighbors = Q_neighbors.view(
-        list(Q_neighbors.shape[:3]) + [3, 3]
-    )  # [16, 464, 30, 3, 3]
-
-    dX = (
-        torch.stack([X_neighbors, N_neighbors, C_neighbors, O_neighbors], dim=3)
-        - X[:, :, None, None, :]
-    )  # [16, 464, 30, 3]
-    dU = torch.matmul(Q[:, :, :, None, :, :], dX[..., None]).squeeze(
-        -1
-    )  # [16, 464, 30, 3] 邻居的相对坐标
-    B, N, K = dU.shape[:3]
-    E_direct = _normalize(dU, dim=-1)
-    E_direct = E_direct.reshape(B, N, K, -1)
-    R = torch.matmul(Q.transpose(-1, -2), Q_neighbors)
-    q = _quaternions(R)
-    # edge_feat = torch.cat((dU, q), dim=-1) # 相对方向向量+旋转四元数
-
-    dX_inner = V[:, :, [0, 2, 3], :] - X.unsqueeze(-2)
-    dU_inner = torch.matmul(Q, dX_inner.unsqueeze(-1)).squeeze(-1)
-    dU_inner = _normalize(dU_inner, dim=-1)
-    V_direct = dU_inner.reshape(B, N, -1)
-    return V_direct, E_direct, q
-
-
-def gather_edges(edges, neighbor_idx):
-    neighbors = neighbor_idx.unsqueeze(-1).expand(-1, -1, -1, edges.size(-1))
-    return torch.gather(edges, 2, neighbors)
-
-
-def gather_nodes(nodes, neighbor_idx):
-    neighbors_flat = neighbor_idx.view(
-        (neighbor_idx.shape[0], -1)
-    )  # [4, 317, 30]-->[4, 9510]
-    neighbors_flat = neighbors_flat.unsqueeze(-1).expand(
-        -1, -1, nodes.size(2)
-    )  # [4, 9510, dim]
-    neighbor_features = torch.gather(nodes, 1, neighbors_flat)  # [4, 9510, dim]
-    return neighbor_features.view(
-        list(neighbor_idx.shape)[:3] + [-1]
-    )  # [4, 317, 30, 128]
-
-
-def _quaternions(R):
-    diag = torch.diagonal(R, dim1=-2, dim2=-1)
-    Rxx, Ryy, Rzz = diag.unbind(-1)
-    magnitudes = 0.5 * torch.sqrt(
-        torch.abs(
-            1 + torch.stack([Rxx - Ryy - Rzz, -Rxx + Ryy - Rzz, -Rxx - Ryy + Rzz], -1)
-        )
-    )
-
-    def _R(i, j):
-        return R[:, :, :, i, j]
-
-    signs = torch.sign(
-        torch.stack([_R(2, 1) - _R(1, 2), _R(0, 2) - _R(2, 0), _R(1, 0) - _R(0, 1)], -1)
-    )
-    xyz = signs * magnitudes
-    w = torch.sqrt(F.relu(1 + diag.sum(-1, keepdim=True))) / 2.0
-    Q = torch.cat((xyz, w), -1)
-    return _normalize(Q, dim=-1)
-
-
 def write_dict_to_json(file_path: str, data: Dict) -> None:
     """Writes a dictionary to a JSON file.
 
@@ -778,41 +536,6 @@ def find_keys_by_value(d: Dict[Any, Any], target_value: Any) -> List[Any]:
         List[Any]: A list of keys that map to the target value.
     """
     return [key for key, value in d.items() if value == target_value]
-
-
-def compute_angles(coords: torch.Tensor) -> torch.Tensor:
-    """
-    Compute the angles between each consecutive atom represented by a 3D coordinate.
-
-    Args:
-        coords (torch.Tensor): A tensor of shape (n, 3) representing the 3D coordinates of atoms.
-
-    Returns:
-        torch.Tensor: A tensor of angles between each consecutive atom.
-    """
-    # Calculate vectors between consecutive atoms
-    vectors = coords[1:] - coords[:-1]
-
-    # Normalize vectors
-    norm_vectors = vectors / torch.norm(vectors, dim=1, keepdim=True)
-
-    # Calculate dot products between consecutive vectors
-    dot_products = torch.sum(norm_vectors[:-1] * norm_vectors[1:], dim=1)
-
-    return torch.acos(torch.clamp(dot_products, -1.0, 1.0))
-
-
-def compute_angle_features(coords: torch.Tensor) -> torch.Tensor:
-    angles = compute_angles(coords)
-    cos_angles = torch.cos(angles)
-    sin_angles = torch.sin(angles)
-    mean_cos = torch.tensor([torch.mean(cos_angles)])
-    mean_sin = torch.tensor([torch.mean(sin_angles)])
-    cos_angles = torch.cat([mean_cos, cos_angles, mean_cos])
-    sin_angles = torch.cat([mean_sin, sin_angles, mean_sin])
-    return torch.stack(
-        [cos_angles, sin_angles],
-    ).T
 
 
 def get_rbf(X):
