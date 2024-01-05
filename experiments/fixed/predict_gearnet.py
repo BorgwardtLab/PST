@@ -20,7 +20,7 @@ from sklearn.neighbors import radius_neighbors_graph
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import from_scipy_sparse_matrix
-from torchdrug import core
+from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
 from pst.esm2 import PST
