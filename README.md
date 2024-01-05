@@ -37,7 +37,7 @@ The dependencies are managed by [mamba][2]
 
 mamba create -n pst python=3.9 pytorch torchvision torchaudio pytorch-cuda=12.1 pyg lightning nvitop pytorch-scatter -c pytorch -c nvidia -c pyg
 mamba activate pst
-pip install proteinshake isort black fair-esm pyprojroot einops torch_geometric==2.3.1 pandas easydict pyprojroot scikit-learn
+pip install proteinshake isort black fair-esm pyprojroot einops torch_geometric==2.3.1 pandas easydict pyprojroot scikit-learn flaml
 
 ```
 
