@@ -12,6 +12,7 @@ import easydict
 import esm
 import jinja2
 import joblib
+import requests
 import torch
 import yaml
 from fastavro import reader as avro_reader
@@ -674,3 +675,29 @@ def get_graph_from_ps_protein(protein, eps=8.0, use_rbfs=True):
         return res
     else:
         return get_graph_from_ps_protein_worker(protein, eps, use_rbfs)
+
+
+def download_url_content(url: str, file_path: str) -> Optional[str]:
+    """
+    Downloads the content from a given URL and saves it to a specified file.
+
+    Args:
+    url (str): The URL of the resource to be downloaded.
+    file_path (str): The file path where the content should be saved.
+
+    Returns:
+    Optional[str]: Error message in case of failure, None otherwise.
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(file_path, "wb") as file:
+            file.write(response.content)
+    except requests.exceptions.HTTPError as e:
+        raise SystemExit(e)
+    except requests.exceptions.ConnectionError as e:
+        raise SystemExit(e)
+    except requests.exceptions.Timeout as e:
+        raise SystemExit(e)
+    except requests.exceptions.RequestException as e:
+        raise SystemExit(e)
