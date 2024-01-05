@@ -1,0 +1,5 @@
+name: pfam
+path: ${datapath}/pfam
+class_name: ProteinFamilyTask
+metric: accuracy
+type: classification

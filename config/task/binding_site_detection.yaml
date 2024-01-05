@@ -1,0 +1,5 @@
+name: binding_site_detection
+path: ${datapath}/binding_site_detection
+class_name: BindingSiteDetectionTask
+metric: mcc
+type: classification

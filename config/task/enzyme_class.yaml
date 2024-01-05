@@ -1,0 +1,5 @@
+name: enzyme_class
+path: ${datapath}/enzyme_class
+class_name: EnzymeClassTask
+metric: accuracy
+type: classification

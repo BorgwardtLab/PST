@@ -1,0 +1,5 @@
+name: gene_ontology
+path: ${datapath}/gene_ontology
+class_name: GeneOntologyTask
+metric: Fmax
+type: classification

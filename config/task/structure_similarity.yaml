@@ -1,0 +1,5 @@
+name: structure_similarity
+path: ${datapath}/structure_similarity
+class_name: StructureSimilarityTask
+metric: spearmanr
+type: regression

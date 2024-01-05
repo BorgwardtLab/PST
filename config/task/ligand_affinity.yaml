@@ -1,0 +1,5 @@
+name: ligand_affinity
+path: ${datapath}/ligand_affinity
+class_name: LigandAffinityTask
+metric: spearmanr
+type: regression

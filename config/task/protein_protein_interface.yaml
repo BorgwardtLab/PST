@@ -1,0 +1,5 @@
+name: protein_protein_interface
+path: ${datapath}/protein_protein_interface
+class_name: ProteinProteinInterfaceTask
+metric: auroc_median
+type: classification

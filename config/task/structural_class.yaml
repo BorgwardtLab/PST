@@ -1,0 +1,5 @@
+name: structural_class
+path: ${datapath}/structural_class
+class_name: StructuralClassTask
+metric: accuracy
+type: classification
