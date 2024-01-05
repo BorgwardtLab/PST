@@ -1,6 +1,7 @@
 ### Custom Directories ###
 logs/
 logs_esm/
+logs_proteinshake/
 data/
 data
 datasets/
