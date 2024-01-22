@@ -1,6 +1,7 @@
 defaults:
   - _self_
   - training: default
+  - base_model: esm2_t6
   - mode: default
 
 debug: false
@@ -26,11 +27,10 @@ logs:
   path: ${logs.prefix}/${model.name}/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
   
 model:
-  name: "esm2_t6_8M_UR50D"
   k_hop: 2
   train_struct_only: true
-  use_edge_attr: true
-  gnn_type: gine
+  use_edge_attr: false
+  gnn_type: gin
   edge_dim: null
 
 # output directory, generated dynamically on each run

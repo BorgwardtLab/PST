@@ -1,0 +1,10 @@
+# @package _global_
+
+model:
+  name: esm2_t33_650M_UR50D
+
+training:
+  batch_size: 12
+  epochs: 5
+  lr: 5.0e-05
+  warmup: 1

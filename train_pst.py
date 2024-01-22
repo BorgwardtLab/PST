@@ -19,7 +19,6 @@ from pst.transforms import (
     PretrainingAttr,
     Proteinshake2ESM,
     RandomCrop,
-    get_val_dataset,
 )
 from pst.utils import get_graph_from_ps_protein
 
@@ -27,7 +26,7 @@ log = logging.getLogger(__name__)
 
 
 @hydra.main(
-    version_base="1.3", config_path=str(here() / "config"), config_name="config"
+    version_base="1.3", config_path=str(here() / "config"), config_name="pst_pretrain"
 )
 def main(cfg):
     log.info(f"Configs:\n{OmegaConf.to_yaml(cfg)}")
@@ -75,19 +74,6 @@ def main(cfg):
         num_workers=cfg.training.num_workers,
     )
 
-    val_dataset = get_val_dataset(
-        root=cfg.data.val_datapath,
-        graph_eps=cfg.data.graph_eps,
-        use_edge_attr=cfg.model.use_edge_attr,
-        n_jobs=cfg.compute.n_jobs,
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=cfg.training.batch_size,
-        shuffle=False,
-        num_workers=cfg.training.num_workers,
-    )
-
     net = PST.from_model_name(
         cfg.model.name,
         k_hop=cfg.model.k_hop,
@@ -109,7 +95,6 @@ def main(cfg):
 
     trainer = pl.Trainer(
         limit_train_batches=5 if cfg.debug else None,
-        val_check_interval=1000 / (len(train_loader) // num_devices),
         max_epochs=cfg.training.epochs,
         precision=cfg.compute.precision,
         accelerator=cfg.compute.accelerator,
@@ -127,9 +112,7 @@ def main(cfg):
         ],
     )
 
-    trainer.validate(model, val_loader)
-
-    trainer.fit(model, train_loader, val_loader)
+    trainer.fit(model, train_loader)
 
     net.save(f"{cfg.logs.path}/model.pt", cfg)
 

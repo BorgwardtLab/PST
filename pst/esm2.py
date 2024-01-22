@@ -127,8 +127,8 @@ class PST(nn.Module):
         torch.save({"cfg": cfg, "state_dict": self.state_dict()}, model_path)
 
     @classmethod
-    def from_pretrained(cls, model_path):
-        checkpoint = torch.load(model_path)
+    def from_pretrained(cls, model_path, **kwargs):
+        checkpoint = torch.load(model_path, **kwargs)
         cfg, state_dict = checkpoint["cfg"], checkpoint["state_dict"]
         model = get_model(
             cls,

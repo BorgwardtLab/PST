@@ -1,0 +1,10 @@
+# @package _global_
+
+model:
+  name: esm2_t6_8M_UR50D
+
+training:
+  batch_size: 128
+  epochs: 50
+  lr: 0.0003
+  warmup: 5

@@ -17,7 +17,8 @@ Please use the following to cite our work:
 
 ### Overview of PST
 
-The structure extractor adopts a uses a GNN on subgraphs of the main 8Å protein structure graph to extract structural information on the resiude level. The resulting residue-level representation can then be linearly projected to the $Q$, $K$ and $V$ vectors of the self-attention mechanism of any (pretrained) transformer model pretrained on larger corpuses of sequences. The pretraining dataset to learn the weights of the structure extractor can much smaller than the pretraining dataset of the sequence-based backbone. 
+PST uses a structure extractor to incorporate protein structures into existing protein language models (PLMs) such as [ESM-2](https://github.com/facebookresearch/esm/tree/main).
+The structure extractor adopts a GNN to extract subgraph representations of the 8Å-neighborhood protein structure graph at each residue (i.e., nodes on the graph). The resulting residue-level subgraph representations are then add to the $Q$, $K$ and $V$ matrices of **each** self-attention block of any (pretrained) transformer model (here we use **ESM-2**) pretrained on larger corpuses of sequences. We name the resulting model PST, which can be trained on any protein structure dataset, by either updating the full model weights or only the weights in the structure extractor. The pretraining dataset could be much smaller than the pretraining dataset of the base sequence model, e.g., SwissProt with only 550k protein structures. 
 
 ### Example of PST with SAT with ESM-2 as backbone
 
@@ -25,13 +26,26 @@ Below you can see a typical setup of PST with the [SAT][3]-based structure extra
 
 ![Model_Arch](figures/PST_SAT_ESM.png)
 
-### Running inference using PST
+### Run inference using PST
 
 To see how you can get better representations from your data using PST, see `./scripts/pst_inference.py` for more details.
 
-### Training PST
+### Pretrained models
 
-You can find the script where we train PST variants in `./train_pst.py`.
+| Model name | #Layers | Embed dim | Train struct only | Model URL |
+|:-----------|:-------:|:---------:|:-----------------:|:---------:|
+| pst_t6     |    6    |    320    |       False       |   link    |
+| pst_t6_so  |    6    |    320    |       True        |   link    |
+
+### Pretrain PST on AlphaFold Swissprot
+
+Run the following code to train a PST model based on the 6-layer ESM-2 model by only training the structure extractor:
+
+```bash
+python train_pst.py model.name=esm2_t6_8M_UR50D model.train_struct_only=true
+```
+
+You can replace `esm2_t6_8M_UR50D` with `esm2_t12_35M_UR50D`, `esm2_t30_150M_UR50D`, `esm2_t33_650M_UR50D` or any pretrained ESM-2 model.
 
 ## Installation
 

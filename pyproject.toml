@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pst"
 authors = [
+    {name = "Dexiong Chen", email = "dchen@biochem.mpg.de"},
     {name = "Philip Hartout", email = "hartout@biochem.mpg.de"},
 ]
 description = "Protein Structure Transformer"
@@ -15,25 +16,10 @@ license = {text = "BSD-3-Clause"}
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
-dependencies = [
-    "hydra-core",
-    "pytest",
-    "proteinshake", 
-    "isort", 
-    "black", 
-    "fair-esm", 
-    "pyprojroot", 
-    "einops", 
-    "torch_geometric==2.3.1", 
-    "pandas", 
-    "easydict", 
-    "pyprojroot", 
-    "scikit-learn"
-]
 dynamic = ["version"]
 
 [tool.setuptools]
-py-modules = []
+packages = ["pst"]
 
 
 [tool.pytest.ini_options]

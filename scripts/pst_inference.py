@@ -146,7 +146,7 @@ def main(cfg):
             str(pretrained_path),
         )
 
-    model, model_cfg = PST.from_pretrained(pretrained_path)
+    model, model_cfg = PST.from_pretrained(pretrained_path, map_location=torch.device('cpu'))
     model.eval()
     model.to(cfg.device)
     esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
