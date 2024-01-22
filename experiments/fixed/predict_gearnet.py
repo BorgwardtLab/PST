@@ -15,7 +15,6 @@ import torchdrug
 from easydict import EasyDict as edict
 from omegaconf import OmegaConf
 from pyprojroot import here
-from sklearn.metrics import make_scorer
 from sklearn.neighbors import radius_neighbors_graph
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
@@ -24,25 +23,11 @@ from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
 from pst.esm2 import PST
+from utils import preprocess, convert_to_numpy, mask_cls_idx
 
 log = logging.getLogger(__name__)
 
 esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
-
-
-def rbf(D, num_rbf):
-    D_min, D_max, D_count = 0.0, 20.0, num_rbf
-    D_mu = torch.linspace(D_min, D_max, D_count).to(D.device)
-    D_mu = D_mu.view([1, 1, 1, -1])
-    D_sigma = (D_max - D_min) / D_count
-    D_expand = torch.unsqueeze(D, -1)
-    RBF = torch.exp(-(((D_expand - D_mu) / D_sigma) ** 2))
-    return RBF
-
-
-def get_rbf(X):
-    D = torch.sqrt(torch.sum((X[:, None, :] - X[None, :, :]) ** 2, -1) + 1e-6)
-    return rbf(D, 16)
 
 
 @torch.no_grad()
@@ -68,7 +53,7 @@ def compute_repr(data_loader, model, cfg):
     return torch.cat(embeddings)
 
 
-def get_structures(dataset, task, use_rbfs=False, eps=8):
+def get_structures(dataset, task, eps=8):
     data_loader = torchdrug.data.DataLoader(dataset, batch_size=1, shuffle=False)
     structures = []
     labels = []
@@ -94,11 +79,7 @@ def get_structures(dataset, task, use_rbfs=False, eps=8):
         )
         edge_index = edge_index + 1  # shift for cls_idx
 
-        if use_rbfs:
-            rbf_dist = get_rbf(coords).squeeze()
-            edge_attr = rbf_dist[edge_index[0, :], edge_index[1, :]]
-        else:
-            edge_attr = None
+        edge_attr = None
 
         structures.append(
             Data(edge_index=edge_index, x=torch_sequence, edge_attr=edge_attr)
@@ -107,39 +88,29 @@ def get_structures(dataset, task, use_rbfs=False, eps=8):
     return structures, torch.cat(labels)
 
 
-def convert_to_numpy(*args):
-    out = []
-    for t in args:
-        out.append(t.numpy().astype("float64"))
-    return out
-
-
-def mask_cls_idx(data):
-    data.idx_mask = torch.ones((len(data.x),), dtype=torch.bool)
-    data.idx_mask[0] = data.idx_mask[-1] = False
-    return data
-
-
 @hydra.main(
-    version_base="1.3", config_path=str(here() / "config"), config_name="sat_gearnet"
+    version_base="1.3", config_path=str(here() / "config"), config_name="pst_gearnet"
 )
 def main(cfg):
     cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
     log.info(f"Configs:\n{OmegaConf.to_yaml(cfg)}")
 
-    if cfg.use_edge_attr:
-        pretrained_path = (
-            Path(cfg.pretrained.prefix) / "with_edge_attr" / cfg.pretrained.name
-        )
+    if cfg.include_seq:
+        pretrained_path = Path(cfg.pretrained) / "pst_so.pt"
     else:
-        if cfg.include_seq:
-            pretrained_path = (
-                Path(cfg.pretrained.prefix) / "train_struct_only" / cfg.pretrained.name
-            )
-        else:
-            pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
+        pretrained_path = Path(cfg.pretrained) / "pst.pt"
 
-    model, model_cfg = PST.from_pretrained(pretrained_path)
+    pretrained_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.include_seq)
+    except:
+        model, model_cfg = PST.from_pretrained_url(
+            cfg.model, pretrained_path,
+            cfg.include_seq,
+            map_location=torch.device('cpu')
+        )
+
     model.eval()
     model.to(cfg.device)
 
@@ -207,6 +178,9 @@ def main(cfg):
     X_val = compute_repr(val_loader, model, cfg)
     X_te = compute_repr(test_loader, model, cfg)
     compute_time = timer() - tic
+    preprocess(X_tr)
+    preprocess(X_val)
+    preprocess(X_te)
 
     X_tr, X_val, X_te, y_tr, y_val, y_te = convert_to_numpy(
         X_tr, X_val, X_te, y_tr, y_val, y_te
@@ -226,121 +200,23 @@ def main(cfg):
         X_te = pca.transform(X_te)
         log.info(f"PCA done. X_tr shape: {X_tr.shape}")
 
-    def scorer(y_true, y_pred, return_all_metric=False):
-        out = task.evaluate(torch.from_numpy(y_pred), torch.from_numpy(y_true))
-        out = {key: value.item() for key, value in out.items()}
-        if return_all_metric:
-            return out
-        return out[cfg.metric]
+    X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).float()
+    X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).float()
+    X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).float()
+    from pst.downstream.mlp import train_and_eval_mlp
 
-    scoring = make_scorer(scorer, needs_threshold=True)
-
-    if cfg.solver == "sklearn_cv":
-        from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
-        from pst.data.sklearn_utils import SklearnPredictor
-
-        estimator = SklearnPredictor("multi_label")
-
-        grid = estimator.get_grid()
-        grid = {key: np.logspace(-3, 1, 9) for key, value in grid.items()}
-
-        test_split_index = [-1] * len(y_tr) + [0] * len(y_val)
-        X_tr_val, y_tr_val = np.concatenate((X_tr, X_val), axis=0), np.concatenate(
-            (y_tr, y_val)
-        )
-
-        splits = PredefinedSplit(test_fold=test_split_index)
-
-        clf = GridSearchCV(
-            estimator=estimator,
-            param_grid=grid,
-            scoring=scoring,
-            cv=splits,
-            refit=False,
-            n_jobs=-1,
-        )
-
-        tic = timer()
-        clf.fit(X_tr_val, y_tr_val)
-        log.info(pd.DataFrame.from_dict(clf.cv_results_).sort_values("rank_test_score"))
-        estimator.set_params(**clf.best_params_)
-        clf = estimator
-        clf.fit(X_tr, y_tr)
-        clf_time = timer() - tic
-    elif cfg.solver == "mlp":
-        X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).float()
-        X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).float()
-        X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).float()
-        from pst.data.mlp_utils import train_and_eval_mlp
-
-        train_and_eval_mlp(
-            X_tr,
-            y_tr,
-            X_val,
-            y_val,
-            X_te,
-            y_te,
-            cfg,
-            task,
-            batch_size=32,
-            epochs=100,
-        )
-        return
-    elif cfg.solver == "chainensemble":
-        from pst.data.sklearn_utils import LinearSVCChainEnsemble
-
-        clf = LinearSVCChainEnsemble(100, scoring)
-
-        tic = timer()
-
-        # with open('chainensemble-100.pkl','rb') as f:
-        #    clf.estimators = pickle.load(f)
-
-        clf.fit(X_tr, y_tr, X_val, y_val)
-        with open("chainensemble-100.pkl", "wb") as f:
-            pickle.dump(clf.estimators, f)
-
-        clf_time = timer() - tic
-    else:
-        raise Exception("Not implemented")
-
-    try:
-        y_pred = clf.decision_function(X_te)
-    except:
-        y_pred = clf.predict_proba(X_te)
-    if isinstance(y_pred, list):
-        if y_pred[0].ndim > 1:
-            y_pred = [y[:, 1] for y in y_pred]
-        y_pred = np.asarray(y_pred).T
-    test_score = scorer(y_te, y_pred, return_all_metric=True)
-    log.info("Test score: ")
-    log.info(test_score)
-
-    # y_val_pred = clf.predict(X_val)
-    try:
-        y_val_pred = clf.decision_function(X_val)
-    except:
-        y_val_pred = clf.predict_proba(X_val)
-    if isinstance(y_val_pred, list):
-        if y_val_pred[0].ndim > 1:
-            y_val_pred = [y[:, 1] for y in y_val_pred]
-        y_val_pred = np.asarray(y_val_pred).T
-    val_score = scorer(y_val, y_val_pred, return_all_metric=True)
-
-    results = [
-        {
-            "test_score": test_score[cfg.metric],
-            "val_score": val_score[cfg.metric],
-            "compute_time": compute_time,
-            "clf_time": clf_time,
-        }
-    ]
-
-    pd.DataFrame(results).to_csv(f"{cfg.logs.path}/results.csv")
-    if cfg.solver == "flaml":
-        with open(f"{cfg.logs.path}/best_config.txt", "w") as f:
-            f.write(json.dumps(clf.best_config))
+    train_and_eval_mlp(
+        X_tr,
+        y_tr,
+        X_val,
+        y_val,
+        X_te,
+        y_te,
+        cfg,
+        task,
+        batch_size=32,
+        epochs=100,
+    )
 
 
 if __name__ == "__main__":

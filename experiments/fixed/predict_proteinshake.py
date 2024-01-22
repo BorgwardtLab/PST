@@ -19,7 +19,8 @@ from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from pst.downstream import compute_metrics, get_task, prepare_data
 from pst.esm2 import PST
 from pst.transforms import PretrainingAttr, Proteinshake2ESM
-from pst.downstream.sklearn_utils import SklearnPredictor
+from pst.downstream.sklearn_wrapper import SklearnPredictor
+from utils import mask_cls_idx
 
 log = logging.getLogger(__name__)
 
@@ -50,12 +51,6 @@ def compute_repr(data_loader, model, task, cfg):
     return embeddings
 
 
-def mask_cls_idx(data):
-    data.idx_mask = torch.ones((len(data.x),), dtype=torch.bool)
-    data.idx_mask[0] = data.idx_mask[-1] = False
-    return data
-
-
 @hydra.main(
     version_base="1.3",
     config_path=str(here() / "config"),
@@ -81,31 +76,15 @@ def main(cfg):
     model.to(cfg.device)
 
     task = get_task(cfg.task.class_name)(root=cfg.task.path, split=cfg.split)
-    if not cfg.use_edge_attr:
-        dataset = task.dataset.to_graph(eps=model_cfg.data.graph_eps).pyg(
-            transform=Compose(
-                [
-                    PretrainingAttr(),
-                    Proteinshake2ESM(mask_cls_idx=True),
-                ]
-            )
+    dataset = task.dataset.to_graph(eps=model_cfg.data.graph_eps).pyg(
+        transform=Compose(
+            [
+                PretrainingAttr(),
+                Proteinshake2ESM(mask_cls_idx=True),
+            ]
         )
-    else:
-        from functools import partial
+    )
 
-        from pst.dataset import CustomGraphDataset
-        from pst.utils import get_graph_from_ps_protein
-
-        featurizer_fn = partial(
-            get_graph_from_ps_protein, use_rbfs=True, eps=model_cfg.data.graph_eps
-        )
-        dataset = CustomGraphDataset(
-            root=cfg.task.path,
-            dataset=task.dataset,
-            pre_transform=featurizer_fn,
-            transform=mask_cls_idx,
-            n_jobs=1,
-        )
     data_loader = DataLoader(
         dataset,
         batch_size=cfg.batch_size,
@@ -156,7 +135,6 @@ def main(cfg):
     clf_time = timer() - tic
     #####
 
-    # y_pred = clf.predict(X_te)
     if task.task_out == "multi_label" or task.task_out == "binary":
         try:
             y_pred = clf.decision_function(X_te)
@@ -171,7 +149,6 @@ def main(cfg):
     test_score = compute_metrics(y_te, y_pred, task)[cfg.task.metric]
     log.info(f"Test score: {test_score:.3f}")
 
-    # y_val_pred = clf.predict(X_val)
     if task.task_out == "multi_label" or task.task_out == "binary":
         try:
             y_val_pred = clf.decision_function(X_val)
@@ -195,9 +172,6 @@ def main(cfg):
     ]
 
     pd.DataFrame(results).to_csv(f"{cfg.logs.path}/results.csv")
-    if cfg.solver == "flaml":
-        with open(f"{cfg.logs.path}/best_config.txt", "w") as f:
-            f.write(json.dumps(clf.best_config))
 
 
 if __name__ == "__main__":

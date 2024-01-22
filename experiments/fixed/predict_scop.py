@@ -16,25 +16,12 @@ from torch_geometric.utils import from_scipy_sparse_matrix
 from tqdm import tqdm
 
 from pst.esm2 import PST
+from pst.downstream.mlp import train_and_eval_linear
+from utils import preprocess, convert_to_numpy, mask_cls_idx
 
 log = logging.getLogger(__name__)
 
 esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
-
-
-def rbf(D, num_rbf):
-    D_min, D_max, D_count = 0.0, 20.0, num_rbf
-    D_mu = torch.linspace(D_min, D_max, D_count).to(D.device)
-    D_mu = D_mu.view([1, 1, 1, -1])
-    D_sigma = (D_max - D_min) / D_count
-    D_expand = torch.unsqueeze(D, -1)
-    RBF = torch.exp(-(((D_expand - D_mu) / D_sigma) ** 2))
-    return RBF
-
-
-def get_rbf(X):
-    D = torch.sqrt(torch.sum((X[:, None, :] - X[None, :, :]) ** 2, -1) + 1e-6)
-    return rbf(D, 16)
 
 
 @torch.no_grad()
@@ -60,7 +47,7 @@ def compute_repr(data_loader, model, cfg):
     return torch.cat(embeddings)
 
 
-def get_structures(dataset, use_rbfs=False, eps=8.0):
+def get_structures(dataset, eps=8.0):
     structures = []
     labels = []
     for protein in tqdm(dataset):
@@ -84,36 +71,13 @@ def get_structures(dataset, use_rbfs=False, eps=8.0):
         )
         edge_index = edge_index + 1  # shift for cls_idx
 
-        if use_rbfs:
-            rbf_dist = get_rbf(coords).squeeze()
-            edge_attr = rbf_dist[edge_index[0, :], edge_index[1, :]]
-        else:
-            edge_attr = None
+        edge_attr = None
 
         structures.append(
             Data(edge_index=edge_index, x=torch_sequence, edge_attr=edge_attr)
         )
 
     return structures, torch.stack(labels)
-
-
-def preprocess(X):
-    X -= X.mean(dim=-1, keepdim=True)
-    X /= X.norm(dim=-1, keepdim=True)
-    return X
-
-
-def convert_to_numpy(*args):
-    out = []
-    for t in args:
-        out.append(t.numpy().astype("float64"))
-    return out
-
-
-def mask_cls_idx(data):
-    data.idx_mask = torch.ones((len(data.x),), dtype=torch.bool)
-    data.idx_mask[0] = data.idx_mask[-1] = False
-    return data
 
 
 @hydra.main(
@@ -232,25 +196,21 @@ def main(cfg):
         X_te = pca.transform(X_te)
         log.info(f"PCA done. X_tr shape: {X_tr.shape}")
 
-    if cfg.solver == "linear":
-        X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).long()
-        X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).long()
-        X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).long()
-        from pst.data.mlp_utils import train_and_eval_linear
+    X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).long()
+    X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).long()
+    X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).long()
 
-        val_score, test_score, test_stratified_score = train_and_eval_linear(
-            X_tr,
-            y_tr,
-            X_val,
-            y_val,
-            X_te,
-            y_te,
-            1195,
-            stratified_indices,
-            use_cuda=torch.cuda.is_available(),
-        )
-    else:
-        raise Exception("Not implemented")
+    val_score, test_score, test_stratified_score = train_and_eval_linear(
+        X_tr,
+        y_tr,
+        X_val,
+        y_val,
+        X_te,
+        y_te,
+        1195,
+        stratified_indices,
+        use_cuda=torch.cuda.is_available(),
+    )
 
     results = [
         {

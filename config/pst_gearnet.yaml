@@ -21,8 +21,7 @@ model: esm2_t6_8M_UR50D
 use_edge_attr: false
 datapath: datasets
 nogpu: false
-budget: 600
-solver: sklearn_cv
+solver: mlp
 metric: 'f1_max'
 batch_size: 4
 num_workers: 4
@@ -31,13 +30,11 @@ device: null
 truncation_seq_length: 5000
 toks_per_batch: 4096
 include_seq: false
-aggr: null
+aggr: concat
 use_pca: null
 
 
-pretrained:
-  prefix: pretrained/${model}
-  name: model.pt
+pretrained: pretrained/${model}
 
 logs:
   prefix: logs_proteinshake/gearnet

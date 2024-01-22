@@ -7,7 +7,6 @@ model: esm2_t6_8M_UR50D
 use_edge_attr: false
 datapath: datasets
 split: structure
-solver: sklearn_cv
 batch_size: 4
 num_workers: 4
 device: null
@@ -21,12 +20,12 @@ pretrained: pretrained/${model}
 
 logs:
   prefix: logs_proteinshake
-  path: ${logs.prefix}/${task.name}/${solver}/${model}/${split}/${seed}
+  path: ${logs.prefix}/${task.name}/${model}/${split}/${seed}
 
 # output directory, generated dynamically on each run
 hydra:
   run:
     dir: ${logs.path}
   sweep:
-    dir: ${logs.prefix}/${task.name}/${solver}/${model}/${split}/${seed}
+    dir: ${logs.prefix}/${task.name}/${model}/${split}/${seed}
     subdir: ""
