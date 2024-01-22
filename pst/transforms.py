@@ -6,8 +6,6 @@ from proteinshake.utils import residue_alphabet
 from torch_geometric import utils
 from torch_geometric.data import Data
 
-from pst.dataset import CustomGraphDataset
-from pst.utils import get_graph_from_ps_protein
 
 esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
 

@@ -76,6 +76,7 @@ def get_structures(dataset, task, eps=8.0):
             ]
         )
         edge_index = edge_index + 1  # shift for cls_idx
+        edge_attr = None
 
         structures.append(
             Data(edge_index=edge_index, x=torch_sequence, edge_attr=edge_attr)

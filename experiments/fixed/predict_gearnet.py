@@ -23,6 +23,7 @@ from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
 from pst.esm2 import PST
+from pst.downstream.mlp import train_and_eval_mlp
 from pst.downstream import (
     preprocess,
     convert_to_numpy,
@@ -211,7 +212,6 @@ def main(cfg):
     X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).float()
     X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).float()
     X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).float()
-    from pst.downstream.mlp import train_and_eval_mlp
 
     train_and_eval_mlp(
         X_tr,

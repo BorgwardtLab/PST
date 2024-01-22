@@ -16,6 +16,7 @@ from pyprojroot import here
 from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
+from pst.downstream.mlp import train_and_eval_mlp
 from pst.downstream import preprocess, convert_to_numpy
 
 log = logging.getLogger(__name__)

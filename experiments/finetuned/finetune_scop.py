@@ -75,11 +75,7 @@ def get_structures(dataset, use_rbfs=False, eps=8.0, max_len=2000):
         )
         edge_index = edge_index + 1  # shift for cls_idx
 
-        if use_rbfs:
-            rbf_dist = get_rbf(coords).squeeze()
-            edge_attr = rbf_dist[edge_index[0, :], edge_index[1, :]]
-        else:
-            edge_attr = None
+        edge_attr = None
 
         structures.append(
             Data(edge_index=edge_index, x=torch_sequence, edge_attr=edge_attr)
