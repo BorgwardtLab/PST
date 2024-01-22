@@ -23,7 +23,11 @@ from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
 from pst.esm2 import PST
-from utils import preprocess, convert_to_numpy, mask_cls_idx
+from pst.downstream import (
+    preprocess,
+    convert_to_numpy,
+    mask_cls_idx,
+)
 
 log = logging.getLogger(__name__)
 
@@ -103,7 +107,11 @@ def main(cfg):
     pretrained_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.include_seq)
+        model, model_cfg = PST.from_pretrained_url(
+            cfg.model,
+            pretrained_path,
+            cfg.include_seq
+        )
     except:
         model, model_cfg = PST.from_pretrained_url(
             cfg.model, pretrained_path,

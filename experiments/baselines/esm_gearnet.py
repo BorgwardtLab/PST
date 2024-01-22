@@ -13,12 +13,10 @@ from esm import FastaBatchedDataset, pretrained
 from omegaconf import OmegaConf
 from pyprojroot import here
 
-# from torchdrug.data import DataLoader
-from sklearn.metrics import make_scorer
 from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
-from pst.data.sklearn_utils import SklearnPredictor
+from pst.downstream import preprocess, convert_to_numpy
 
 log = logging.getLogger(__name__)
 
@@ -74,13 +72,6 @@ def get_loader(seqs, alphabet, cfg):
         batch_sampler=batches,
     )
     return data_loader
-
-
-def convert_to_numpy(*args):
-    out = []
-    for t in args:
-        out.append(t.numpy().astype("float64"))
-    return out
 
 
 @hydra.main(
@@ -141,6 +132,11 @@ def main(cfg):
     X_val = compute_repr(val_loader, model, cfg)
     X_te = compute_repr(test_loader, model, cfg)
     compute_time = timer() - tic
+
+    preprocess(X_tr)
+    preprocess(X_val)
+    preprocess(X_te)
+
     X_tr, X_val, X_te, y_tr, y_val, y_te = convert_to_numpy(
         X_tr, X_val, X_te, y_tr, y_val, y_te
     )
@@ -157,200 +153,22 @@ def main(cfg):
         X_te = pca.transform(X_te)
         log.info(f"PCA done. X_tr shape: {X_tr.shape}")
 
-    def scorer(y_true, y_pred, return_all_metric=False):
-        out = task.evaluate(torch.from_numpy(y_pred), torch.from_numpy(y_true))
-        out = {key: value.item() for key, value in out.items()}
-        if return_all_metric:
-            return out
-        return out[cfg.metric]
+    X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).float()
+    X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).float()
+    X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).float()
 
-    scoring = make_scorer(scorer, needs_threshold=True)
-
-    if cfg.solver == "flaml":
-        from flaml import AutoML
-
-        from pst.data.sklearn_utils import MyMultiOutputClassifier
-
-        clf = AutoML()
-        # def custom_metric(
-        #     X_test, y_test, estimator, labels,
-        #     X_train, y_train, weight_test=None, weight_train=None,
-        #     config=None, groups_test=None, groups_train=None,
-        # ):
-        #     if cfg.task.type == "classification":
-        #         y_pred = estimator.predict_proba(X_test)
-        #     else:
-        #         y_pred = estimator.predict(X_test)
-        #     val_score = task.evaluate(y_pred, y_test)[cfg.metric]
-        #     return -val_score, {'val_score': val_score}
-        clf = MyMultiOutputClassifier(clf, n_jobs=-1)
-        settings = {
-            "metric": "f1",
-            "task": "classification",
-            "estimator_list": ["lgbm"],
-            "seed": cfg.seed,
-            "time_budget": cfg.budget,
-            "auto_augment": False,
-            "n_jobs": 1,
-            "verbose": 1,
-        }
-        clf.fit(X_tr, y_tr, X_val=X_val, y_val=y_val, **settings)
-        clf_time = clf.best_config_train_time
-    elif cfg.solver == "sklearn_cv":
-        from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
-        estimator = SklearnPredictor("multi_label")
-
-        grid = estimator.get_grid()
-        grid = {key: np.logspace(-3, 4, 15) for key, value in grid.items()}
-
-        test_split_index = [-1] * len(y_tr) + [0] * len(y_val)
-        X_tr_val, y_tr_val = np.concatenate((X_tr, X_val), axis=0), np.concatenate(
-            (y_tr, y_val)
-        )
-
-        splits = PredefinedSplit(test_fold=test_split_index)
-
-        clf = GridSearchCV(
-            estimator=estimator,
-            param_grid=grid,
-            scoring=scoring,
-            cv=splits,
-            refit=False,
-            n_jobs=-1,
-        )
-
-        tic = timer()
-        clf.fit(X_tr_val, y_tr_val)
-        log.info(pd.DataFrame.from_dict(clf.cv_results_).sort_values("rank_test_score"))
-        estimator.set_params(**clf.best_params_)
-        clf = estimator
-        clf.fit(X_tr, y_tr)
-        clf_time = timer() - tic
-    elif cfg.solver == "rf":
-        from flaml import tune
-        from flaml.automl.model import RandomForestEstimator
-        from flaml.automl.task.factory import task_factory
-        from sklearn.ensemble import RandomForestClassifier
-
-        flaml_search_space = RandomForestEstimator.search_space(
-            X_tr.shape,
-            task_factory("classification"),
-        )
-
-        config_search_space = {
-            hp: space["domain"] for hp, space in flaml_search_space.items()
-        }
-        low_cost_partial_config = {
-            hp: space["low_cost_init_value"]
-            for hp, space in flaml_search_space.items()
-            if "low_cost_init_value" in space
-        }
-        points_to_evaluate = [
-            {
-                hp: space["init_value"]
-                for hp, space in flaml_search_space.items()
-                if "init_value" in space
-            }
-        ]
-
-        # estimator = RandomForestClassifier(n_jobs=-1)
-
-        def train_rf(config):
-            params = RandomForestEstimator(
-                task_factory("classification"), **config
-            ).params
-            # estimator = estimator.set_params(**params)
-            estimator = RandomForestClassifier(n_jobs=-1, **params)
-            estimator.fit(X_tr, y_tr)
-
-            y_pred = estimator.predict_proba(X_val)
-            if y_pred[0].ndim > 1:
-                y_pred = [y[:, 1] for y in y_pred]
-            y_pred = np.asarray(y_pred).T
-            val_score = scorer(y_val, y_pred, return_all_metric=True)
-            return val_score
-
-        tic = timer()
-        analysis = tune.run(
-            train_rf,
-            metric=cfg.metric,
-            mode="max",
-            config=config_search_space,
-            low_cost_partial_config=low_cost_partial_config,
-            points_to_evaluate=points_to_evaluate,
-            time_budget_s=cfg.budget,
-            num_samples=-1,
-        )
-
-        print(analysis.best_result)
-        best_params = RandomForestEstimator(
-            task_factory("classification"), **analysis.best_config
-        ).params
-        print(best_params)
-        clf = RandomForestClassifier(n_jobs=-1, **best_params)
-        clf.fit(X_tr, y_tr)
-        clf_time = timer() - tic
-    elif cfg.solver == "mlp":
-        X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).float()
-        X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).float()
-        X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).float()
-        from pst.data.mlp_utils import train_and_eval_mlp
-
-        train_and_eval_mlp(
-            X_tr,
-            y_tr,
-            X_val,
-            y_val,
-            X_te,
-            y_te,
-            cfg,
-            task,
-            batch_size=32,
-            epochs=100,
-        )
-        return
-    else:
-        raise NotImplementedError
-    # y_pred = clf.predict(X_te)
-    try:
-        y_pred = clf.decision_function(X_te)
-    except:
-        print("here")
-        y_pred = clf.predict_proba(X_te)
-    if isinstance(y_pred, list):
-        if y_pred[0].ndim > 1:
-            y_pred = [y[:, 1] for y in y_pred]
-        y_pred = np.asarray(y_pred).T
-    test_score = scorer(y_te, y_pred, return_all_metric=True)
-    log.info("Test score: ")
-    log.info(test_score)
-
-    # y_val_pred = clf.predict(X_val)
-    try:
-        y_val_pred = clf.decision_function(X_val)
-    except:
-        y_val_pred = clf.predict_proba(X_val)
-    if isinstance(y_val_pred, list):
-        if y_val_pred[0].ndim > 1:
-            y_val_pred = [y[:, 1] for y in y_val_pred]
-        y_val_pred = np.asarray(y_val_pred).T
-    val_score = scorer(y_val, y_val_pred, return_all_metric=True)
-
-    results = [
-        {
-            "test_score": test_score[cfg.metric],
-            "val_score": val_score[cfg.metric],
-            "compute_time": compute_time,
-            "clf_time": clf_time,
-        }
-    ]
-
-    pd.DataFrame(results).to_csv(f"{cfg.logs.path}/results.csv")
-    if cfg.solver == "flaml":
-        with open(f"{cfg.logs.path}/best_config.txt", "w") as f:
-            f.write(json.dumps(clf.best_config))
-
+    train_and_eval_mlp(
+        X_tr,
+        y_tr,
+        X_val,
+        y_val,
+        X_te,
+        y_te,
+        cfg,
+        task,
+        batch_size=32,
+        epochs=100,
+    )
 
 if __name__ == "__main__":
     main()

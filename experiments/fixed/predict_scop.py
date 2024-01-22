@@ -17,7 +17,11 @@ from tqdm import tqdm
 
 from pst.esm2 import PST
 from pst.downstream.mlp import train_and_eval_linear
-from utils import preprocess, convert_to_numpy, mask_cls_idx
+from pst.downstream import (
+    preprocess,
+    convert_to_numpy,
+    mask_cls_idx,
+)
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +85,7 @@ def get_structures(dataset, eps=8.0):
 
 
 @hydra.main(
-    version_base="1.3", config_path=str(here() / "config"), config_name="sat_gearnet"
+    version_base="1.3", config_path=str(here() / "config"), config_name="pst_gearnet"
 )
 def main(cfg):
     cfg.device = "cuda" if torch.cuda.is_available() else "cpu"

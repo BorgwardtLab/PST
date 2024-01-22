@@ -19,7 +19,7 @@ struct_only: false
 pretrained: pretrained/${model}
 
 logs:
-  prefix: logs_proteinshake
+  prefix: logs_pst/proteinshake
   path: ${logs.prefix}/${task.name}/${model}/${split}/${seed}
 
 # output directory, generated dynamically on each run

@@ -5,9 +5,29 @@ from sklearn import metrics
 from scipy.stats import spearmanr
 
 
+def mask_cls_idx(data):
+    data.idx_mask = torch.ones((len(data.x),), dtype=torch.bool)
+    data.idx_mask[0] = data.idx_mask[-1] = False
+    return data
+
+
+def convert_to_numpy(*args):
+    out = []
+    for t in args:
+        out.append(t.numpy().astype('float64'))
+    return out
+
+
+def preprocess(X):
+    X -= X.mean(dim=-1, keepdim=True)
+    X /= X.norm(dim=-1, keepdim=True)
+    return X
+
+
 def get_task(task_name):
     all_task_classes = importlib.import_module('proteinshake.tasks')
     return getattr(all_task_classes, task_name)
+
 
 def prepare_data(X, task, use_pca=False):
     train_idx, val_idx, test_idx = task.train_index, task.val_index, task.test_index

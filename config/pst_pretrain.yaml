@@ -23,7 +23,7 @@ compute:
   n_jobs: 10
 
 logs:
-  prefix: logs
+  prefix: logs_pst/pretrain
   path: ${logs.prefix}/${model.name}/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
   
 model:

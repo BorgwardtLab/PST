@@ -16,11 +16,15 @@ from tqdm import tqdm
 from sklearn.metrics import make_scorer
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 
-from pst.downstream import compute_metrics, get_task, prepare_data
+from pst.downstream import (
+    compute_metrics,
+    get_task, 
+    prepare_data,
+    mask_cls_idx
+)
 from pst.esm2 import PST
 from pst.transforms import PretrainingAttr, Proteinshake2ESM
 from pst.downstream.sklearn_wrapper import SklearnPredictor
-from utils import mask_cls_idx
 
 log = logging.getLogger(__name__)
 
@@ -66,11 +70,19 @@ def main(cfg):
         pretrained_path = Path(cfg.pretrained) / "pst.pt"
     pretrained_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # model, model_cfg = PST.from_pretrained(pretrained_path)
     try:
-        model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.struct_only)
+        model, model_cfg = PST.from_pretrained_url(
+            cfg.model,
+            pretrained_path,
+            cfg.struct_only
+        )
     except:
-        model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.struct_only, map_location=torch.device('cpu'))
+        model, model_cfg = PST.from_pretrained_url(
+            cfg.model,
+            pretrained_path,
+            cfg.struct_only,
+            map_location=torch.device('cpu')
+        )
 
     model.eval()
     model.to(cfg.device)
@@ -95,7 +107,7 @@ def main(cfg):
     X = compute_repr(data_loader, model, task, cfg)
     compute_time = timer() - tic
     X_tr, y_tr, X_val, y_val, X_te, y_te = prepare_data(X, task)
-    print(f"X_tr shape: {X_tr.shape} y_tr shape: {y_tr.shape}")
+    log.info(f"X_tr shape: {X_tr.shape} y_tr shape: {y_tr.shape}")
 
     ## Solving the problem with sklearn
     estimator = SklearnPredictor(task.task_out)

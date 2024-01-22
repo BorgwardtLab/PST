@@ -10,6 +10,9 @@ from omegaconf import OmegaConf
 from pyprojroot import here
 from tqdm import tqdm
 
+from pst.downstream.mlp import train_and_eval_linear
+from pst.downstream import preprocess, convert_to_numpy
+
 log = logging.getLogger(__name__)
 
 
@@ -62,19 +65,6 @@ def get_loader(seqs, alphabet, cfg):
         batch_sampler=batches,
     )
     return data_loader
-
-
-def preprocess(X):
-    X -= X.mean(dim=-1, keepdim=True)
-    X /= X.norm(dim=-1, keepdim=True)
-    return X
-
-
-def convert_to_numpy(*args):
-    out = []
-    for t in args:
-        out.append(t.numpy().astype("float64"))
-    return out
 
 
 @hydra.main(
@@ -138,25 +128,21 @@ def main(cfg):
         X_te = pca.transform(X_te)
         log.info(f"PCA done. X_tr shape: {X_tr.shape}")
 
-    if cfg.solver == "linear":
-        X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).long()
-        X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).long()
-        X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).long()
-        from pst.data.mlp_utils import train_and_eval_linear
+    X_tr, y_tr = torch.from_numpy(X_tr).float(), torch.from_numpy(y_tr).long()
+    X_val, y_val = torch.from_numpy(X_val).float(), torch.from_numpy(y_val).long()
+    X_te, y_te = torch.from_numpy(X_te).float(), torch.from_numpy(y_te).long()
 
-        val_score, test_score, test_stratified_score = train_and_eval_linear(
-            X_tr,
-            y_tr,
-            X_val,
-            y_val,
-            X_te,
-            y_te,
-            1195,
-            stratified_indices,
-            use_cuda=torch.cuda.is_available(),
-        )
-    else:
-        raise NotImplementedError
+    val_score, test_score, test_stratified_score = train_and_eval_linear(
+        X_tr,
+        y_tr,
+        X_val,
+        y_val,
+        X_te,
+        y_te,
+        1195,
+        stratified_indices,
+        use_cuda=torch.cuda.is_available(),
+    )
 
     results = [
         {

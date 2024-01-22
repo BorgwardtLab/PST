@@ -21,7 +21,6 @@ model: esm2_t6_8M_UR50D
 use_edge_attr: false
 datapath: datasets
 nogpu: false
-solver: mlp
 metric: 'f1_max'
 batch_size: 4
 num_workers: 4
@@ -33,17 +32,16 @@ include_seq: false
 aggr: concat
 use_pca: null
 
-
 pretrained: pretrained/${model}
 
 logs:
-  prefix: logs_proteinshake/gearnet
-  path: ${logs.prefix}/${dataset.name}/${solver}/${model}/${aggr}/${include_seq}/${seed}
+  prefix: logs_pst/gearnet_data
+  path: ${logs.prefix}/${dataset.name}/${model}/${aggr}/${include_seq}/${seed}
 
 # output directory, generated dynamically on each run
 hydra:
   run:
     dir: ${logs.path}
   sweep:
-    dir: ${logs.prefix}/${dataset.name}/${solver}/${model}/${aggr}/${include_seq}/${seed}
+    dir: ${logs.prefix}/${dataset.name}/${model}/${aggr}/${include_seq}/${seed}
     subdir: ""
