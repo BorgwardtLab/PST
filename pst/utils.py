@@ -233,6 +233,16 @@ def make_batches(l, n):
     return [l[i : i + n] for i in range(0, len(l), n)]
 
 
+def rbf(D, num_rbf):
+    D_min, D_max, D_count = 0.0, 20.0, num_rbf
+    D_mu = torch.linspace(D_min, D_max, D_count).to(D.device)
+    D_mu = D_mu.view([1, 1, 1, -1])
+    D_sigma = (D_max - D_min) / D_count
+    D_expand = torch.unsqueeze(D, -1)
+    RBF = torch.exp(-(((D_expand - D_mu) / D_sigma) ** 2))
+    return RBF
+
+
 def get_rbf(X):
     D = torch.sqrt(torch.sum((X[:, None, :] - X[None, :, :]) ** 2, -1) + 1e-6)
     return rbf(D, 16)

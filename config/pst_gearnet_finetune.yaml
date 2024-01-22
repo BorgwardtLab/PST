@@ -40,9 +40,7 @@ compute:
   num_workers: 8
   n_jobs: 10
 
-pretrained:
-  prefix: pretrained/${model}
-  name: model.pt
+pretrained: pretrained/${model}
 
 logs:
   prefix: logs_proteinshake/gearnet/finetune
