@@ -17,7 +17,7 @@ from torch import nn
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import from_scipy_sparse_matrix
-from torchdrug import core
+from torchdrug import core, datasets, models, tasks
 from tqdm import tqdm
 
 from pst.esm2 import PST, ProteinNet
