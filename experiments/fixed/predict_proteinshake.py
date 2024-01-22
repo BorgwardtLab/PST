@@ -13,10 +13,13 @@ from proteinshake.transforms import Compose
 from pyprojroot import here
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
+from sklearn.metrics import make_scorer
+from sklearn.model_selection import GridSearchCV, PredefinedSplit
 
-from pst.data_utils import compute_metrics, get_task, prepare_data
+from pst.downstream import compute_metrics, get_task, prepare_data
 from pst.esm2 import PST
 from pst.transforms import PretrainingAttr, Proteinshake2ESM
+from pst.downstream.sklearn_utils import SklearnPredictor
 
 log = logging.getLogger(__name__)
 
@@ -62,17 +65,6 @@ def main(cfg):
     cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
     log.info(f"Configs:\n{OmegaConf.to_yaml(cfg)}")
 
-    # if cfg.use_edge_attr:
-    #     pretrained_path = (
-    #         Path(cfg.pretrained.prefix) / "with_edge_attr" / cfg.pretrained.name
-    #     )
-    # else:
-    #     if cfg.struct_only:
-    #         pretrained_path = (
-    #             Path(cfg.pretrained.prefix) / "train_struct_only" / cfg.pretrained.name
-    #         )
-    #     else:
-    #         pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
     if cfg.struct_only:
         pretrained_path = Path(cfg.pretrained) / "pst_so.pt"
     else:
@@ -84,6 +76,7 @@ def main(cfg):
         model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.struct_only)
     except:
         model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.struct_only, map_location=torch.device('cpu'))
+
     model.eval()
     model.to(cfg.device)
 
@@ -125,152 +118,43 @@ def main(cfg):
     X_tr, y_tr, X_val, y_val, X_te, y_te = prepare_data(X, task)
     print(f"X_tr shape: {X_tr.shape} y_tr shape: {y_tr.shape}")
 
-    if cfg.solver == "flaml":
-        from flaml import AutoML
+    ## Solving the problem with sklearn
+    estimator = SklearnPredictor(task.task_out)
 
-        clf = AutoML()
+    grid = estimator.get_grid()
 
-        def custom_metric(
-            X_test,
-            y_test,
-            estimator,
-            labels,
-            X_train,
-            y_train,
-            weight_test=None,
-            weight_train=None,
-            config=None,
-            groups_test=None,
-            groups_train=None,
-        ):
-            if cfg.task.type == "classification":
-                y_pred = estimator.predict_proba(X_test)
-            else:
-                y_pred = estimator.predict(X_test)
-            val_score = compute_metrics(y_test, y_pred, task)[cfg.task.metric]
-            return -val_score, {"val_score": val_score}
+    scoring = lambda y_true, y_pred: compute_metrics(y_true, y_pred, task)[
+        cfg.task.metric
+    ]
+    if task.task_out == "multi_label" or task.task_out == "binary":
+        scoring = make_scorer(scoring, needs_threshold=True)
+    else:
+        scoring = make_scorer(scoring)
 
-        settings = {
-            "metric": custom_metric,
-            "task": cfg.task.type,
-            "estimator_list": ["lgbm"],
-            "seed": cfg.seed,
-            "time_budget": cfg.budget,
-        }
-        clf.fit(X_train=X_tr, y_train=y_tr, X_val=X_val, y_val=y_val, **settings)
-        clf_time = clf.best_config_train_time
-    elif cfg.solver == "sklearn":
-        import copy
+    test_split_index = [-1] * len(y_tr) + [0] * len(y_val)
+    X_tr_val, y_tr_val = np.concatenate((X_tr, X_val), axis=0), np.concatenate(
+        (y_tr, y_val)
+    )
 
-        from pst.data.sklearn_utils import SklearnPredictor
+    splits = PredefinedSplit(test_fold=test_split_index)
 
-        clf = SklearnPredictor(task.task_out)
+    clf = GridSearchCV(
+        estimator=estimator,
+        param_grid=grid,
+        scoring=scoring,
+        cv=splits,
+        refit=False,
+        n_jobs=-1,
+    )
 
-        grid = clf.get_grid()
-
-        best_val_score = 0.0
-        best_model = None
-        tic = timer()
-        for param, values in grid.items():
-            for value in values:
-                clf.set_params(**{param: value})
-                clf.fit(X_tr, y_tr)
-                val_score = compute_metrics(y_val, clf.predict(X_val), task)[
-                    cfg.task.metric
-                ]
-                test_score = compute_metrics(y_te, clf.predict(X_te), task)[
-                    cfg.task.metric
-                ]
-                if val_score > best_val_score:
-                    best_val_score = val_score
-                    best_model = copy.deepcopy(clf)
-                log.info(
-                    f"trained model with {param}={value}, val score: {val_score} test score: {test_score}"
-                )
-        clf_time = timer() - tic
-        clf = best_model
-    elif cfg.solver == "sklearn_cv":
-        import copy
-
-        from sklearn.metrics import make_scorer
-        from sklearn.model_selection import GridSearchCV, PredefinedSplit
-
-        from pst.data.sklearn_utils import SklearnPredictor
-
-        estimator = SklearnPredictor(task.task_out)
-
-        grid = estimator.get_grid()
-
-        scoring = lambda y_true, y_pred: compute_metrics(y_true, y_pred, task)[
-            cfg.task.metric
-        ]
-        if task.task_out == "multi_label" or task.task_out == "binary":
-            scoring = make_scorer(scoring, needs_threshold=True)
-        else:
-            scoring = make_scorer(scoring)
-
-        test_split_index = [-1] * len(y_tr) + [0] * len(y_val)
-        X_tr_val, y_tr_val = np.concatenate((X_tr, X_val), axis=0), np.concatenate(
-            (y_tr, y_val)
-        )
-
-        splits = PredefinedSplit(test_fold=test_split_index)
-
-        clf = GridSearchCV(
-            estimator=estimator,
-            param_grid=grid,
-            scoring=scoring,
-            cv=splits,
-            refit=False,
-            n_jobs=-1,
-        )
-
-        tic = timer()
-        clf.fit(X_tr_val, y_tr_val)
-        log.info(pd.DataFrame.from_dict(clf.cv_results_).sort_values("rank_test_score"))
-        estimator.set_params(**clf.best_params_)
-        clf = estimator
-        clf.fit(X_tr, y_tr)
-        clf_time = timer() - tic
-    elif cfg.solver == "cyanure":
-        import copy
-
-        from cyanure import preprocess
-
-        from pst.data.cyanure_utils import CyanurePredictor
-
-        if cfg.task.name != "structure_similarity":
-            preprocess(X_tr, normalize=True, columns=False)
-            preprocess(X_val, normalize=True, columns=False)
-            preprocess(X_te, normalize=True, columns=False)
-
-        clf = CyanurePredictor(task.task_out)
-
-        grid = {
-            "C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0],
-        }
-
-        best_val_score = 0.0
-        best_model = None
-        tic = timer()
-        for param, values in grid.items():
-            for value in values:
-                clf.set_params(**{param: value})
-                clf.fit(X_tr, y_tr)
-                val_score = compute_metrics(y_val, clf.predict(X_val), task)[
-                    cfg.task.metric
-                ]
-                test_score = compute_metrics(y_te, clf.predict(X_te), task)[
-                    cfg.task.metric
-                ]
-                if val_score > best_val_score:
-                    best_val_score = val_score
-                    best_model = copy.deepcopy(clf)
-                log.info(
-                    f"trained model with {param}={value}, val score: {val_score} test score: {test_score}"
-                )
-        clf_time = timer() - tic
-        clf = best_model
+    tic = timer()
+    clf.fit(X_tr_val, y_tr_val)
+    log.info(pd.DataFrame.from_dict(clf.cv_results_).sort_values("rank_test_score"))
+    estimator.set_params(**clf.best_params_)
+    clf = estimator
+    clf.fit(X_tr, y_tr)
+    clf_time = timer() - tic
+    #####
 
     # y_pred = clf.predict(X_te)
     if task.task_out == "multi_label" or task.task_out == "binary":
