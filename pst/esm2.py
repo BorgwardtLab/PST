@@ -187,7 +187,7 @@ import torch_geometric.nn as gnn
 
 
 class ProteinNet(nn.Module):
-    def __init__(self, base_model, num_class, out_head="linear", aggr=None):
+    def __init__(self, base_model, num_class, out_head="linear", aggr=None, dropout=0.5):
         super().__init__()
         self.base_model = base_model
         self.embed_dim = self.base_model.embed_dim
@@ -195,18 +195,25 @@ class ProteinNet(nn.Module):
         self.num_class = num_class
 
         if out_head == "linear":
-            self.out_head = nn.Linear(self.embed_dim, self.num_class)
+            self.out_head = nn.Sequential(
+                nn.Dropout(dropout),
+                nn.Linear(self.embed_dim, self.num_class)
+            )
         else:
             self.out_head = nn.Sequential(
+                nn.Dropout(dropout),
                 nn.Linear(self.embed_dim, self.embed_dim // 2),
                 nn.ReLU(True),
+                nn.Dropout(dropout),
                 nn.Linear(self.embed_dim // 2, self.embed_dim // 4),
                 nn.ReLU(True),
-                nn.Linear(self.embed_dim // 4, self.num_class),
+                nn.Dropout(dropout),
+                nn.Linear(self.embed_dim // 4, self.num_class)
             )
 
         self.aggr = aggr
         if aggr == "concat":
+            self.norm = nn.LayerNorm(self.embed_dim * len(base_model.layers))
             self.lin_proj = nn.ModuleList(
                 [
                     nn.Linear(self.embed_dim, self.embed_dim, bias=False)
@@ -219,7 +226,7 @@ class ProteinNet(nn.Module):
             import itertools
 
             return itertools.chain(
-                self.out_head.parameters(), self.lin_proj.parameters()
+                self.out_head.parameters(), self.norm.parameters(), self.lin_proj.parameters()
             )
         else:
             return self.out_head.parameters()
@@ -235,11 +242,12 @@ class ProteinNet(nn.Module):
             out_seq = gnn.global_mean_pool(out_seq, batch)
             out = (out + out_seq) * 0.5
         if self.aggr == "concat":
+            out = self.norm(out)
             new_out = 0
             for i in range(len(self.lin_proj)):
                 new_out = new_out + self.lin_proj[i](
                     out[:, i * self.embed_dim : (i + 1) * self.embed_dim]
                 )
-            out = new_out
+            out = new_out / len(self.lin_proj)
         out = self.out_head(out)
         return out

@@ -171,49 +171,52 @@ class ProteinTaskTrainer(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             [
-                {"params": self.model.base_model.parameters(), "lr": 1e-05},
-                {"params": self.model.head_parameters()},
+                {"params": self.model.base_model.parameters(), "lr": self.cfg.training.lr * 0.01},
+                {"params": self.model.head_parameters(), 'weight_decay': self.cfg.training.weight_decay},
             ],
             lr=self.cfg.training.lr,
-            weight_decay=self.cfg.training.weight_decay,
+            # weight_decay=self.cfg.training.weight_decay,
         )
-        # lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        #     optimizer,
-        #     mode='max',
-        #     factor=0.5,
-        #     patience=5
-        # )
-        lr_scheduler = get_linear_schedule_with_warmup(
-            optimizer, self.cfg.num_iterations // 20, self.cfg.num_iterations
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='max',
+            factor=0.5,
+            patience=4
         )
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": lr_scheduler, "interval": "step"},
+            "lr_scheduler": {"scheduler": lr_scheduler, "monitor": "val_f1_max"},
         }
 
 
 @hydra.main(
     version_base="1.3",
     config_path=str(here() / "config"),
-    config_name="sat_gearnet_finetune",
+    config_name="pst_gearnet_finetune",
 )
 def main(cfg):
     log.info(f"Configs:\n{OmegaConf.to_yaml(cfg)}")
     pl.seed_everything(cfg.seed, workers=True)
 
-    if cfg.use_edge_attr:
-        pretrained_path = (
-            Path(cfg.pretrained.prefix) / "with_edge_attr" / cfg.pretrained.name
-        )
+    if cfg.include_seq:
+        pretrained_path = Path(cfg.pretrained) / "pst_so.pt"
     else:
-        if cfg.include_seq:
-            pretrained_path = (
-                Path(cfg.pretrained.prefix) / "train_struct_only" / cfg.pretrained.name
-            )
-        else:
-            pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
+        pretrained_path = Path(cfg.pretrained) / "pst.pt"
 
-    model, model_cfg = PST.from_pretrained(pretrained_path)
+    pretrained_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        model, model_cfg = PST.from_pretrained_url(
+            cfg.model,
+            pretrained_path,
+            cfg.include_seq
+        )
+    except:
+        model, model_cfg = PST.from_pretrained_url(
+            cfg.model, pretrained_path,
+            cfg.include_seq,
+            map_location=torch.device('cpu')
+        )
 
     task = core.Configurable.load_config_dict(
         edict(OmegaConf.to_container(cfg.task, resolve=True))
@@ -249,7 +252,6 @@ def main(cfg):
             structure_path,
         )
 
-    # this is awful i know, todo: proper transform and dataset
     train_str = [
         mask_cls_idx(add_label(data, y_tr[i])) for i, data in enumerate(train_str)
     ]
