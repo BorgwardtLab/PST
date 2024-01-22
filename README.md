@@ -42,10 +42,10 @@ To see how you can get better representations from your data using PST, see `./s
 Run the following code to train a PST model based on the 6-layer ESM-2 model by only training the structure extractor:
 
 ```bash
-python train_pst.py model.name=esm2_t6_8M_UR50D model.train_struct_only=true
+python train_pst.py base_model=esm2_t6 model.train_struct_only=true
 ```
 
-You can replace `esm2_t6_8M_UR50D` with `esm2_t12_35M_UR50D`, `esm2_t30_150M_UR50D`, `esm2_t33_650M_UR50D` or any pretrained ESM-2 model.
+You can replace `esm2_t6` with `esm2_t12`, `esm2_t30`, `esm2_t33` or any pretrained ESM-2 model.
 
 ## Installation
 

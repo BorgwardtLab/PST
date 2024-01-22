@@ -14,7 +14,7 @@ from pyprojroot import here
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
-from pst.data import compute_metrics, get_task, prepare_data
+from pst.data_utils import compute_metrics, get_task, prepare_data
 from pst.esm2 import PST
 from pst.transforms import PretrainingAttr, Proteinshake2ESM
 
@@ -56,25 +56,34 @@ def mask_cls_idx(data):
 @hydra.main(
     version_base="1.3",
     config_path=str(here() / "config"),
-    config_name="sat_proteinshake",
+    config_name="pst_proteinshake",
 )
 def main(cfg):
     cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
     log.info(f"Configs:\n{OmegaConf.to_yaml(cfg)}")
 
-    if cfg.use_edge_attr:
-        pretrained_path = (
-            Path(cfg.pretrained.prefix) / "with_edge_attr" / cfg.pretrained.name
-        )
+    # if cfg.use_edge_attr:
+    #     pretrained_path = (
+    #         Path(cfg.pretrained.prefix) / "with_edge_attr" / cfg.pretrained.name
+    #     )
+    # else:
+    #     if cfg.struct_only:
+    #         pretrained_path = (
+    #             Path(cfg.pretrained.prefix) / "train_struct_only" / cfg.pretrained.name
+    #         )
+    #     else:
+    #         pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
+    if cfg.struct_only:
+        pretrained_path = Path(cfg.pretrained) / "pst_so.pt"
     else:
-        if cfg.struct_only:
-            pretrained_path = (
-                Path(cfg.pretrained.prefix) / "train_struct_only" / cfg.pretrained.name
-            )
-        else:
-            pretrained_path = Path(cfg.pretrained.prefix) / cfg.pretrained.name
+        pretrained_path = Path(cfg.pretrained) / "pst.pt"
+    pretrained_path.parent.mkdir(parents=True, exist_ok=True)
 
-    model, model_cfg = PST.from_pretrained(pretrained_path)
+    # model, model_cfg = PST.from_pretrained(pretrained_path)
+    try:
+        model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.struct_only)
+    except:
+        model, model_cfg = PST.from_pretrained_url(cfg.model, pretrained_path, cfg.struct_only, map_location=torch.device('cpu'))
     model.eval()
     model.to(cfg.device)
 

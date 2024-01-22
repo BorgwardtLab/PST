@@ -7,8 +7,7 @@ model: esm2_t6_8M_UR50D
 use_edge_attr: false
 datapath: datasets
 split: structure
-budget: 600
-solver: flaml
+solver: sklearn_cv
 batch_size: 4
 num_workers: 4
 device: null
@@ -18,9 +17,7 @@ toks_per_batch: 4096
 include_seq: false
 struct_only: false
 
-pretrained:
-  prefix: pretrained/${model}
-  name: model.pt
+pretrained: pretrained/${model}
 
 logs:
   prefix: logs_proteinshake
