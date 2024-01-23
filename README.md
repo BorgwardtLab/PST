@@ -1,6 +1,6 @@
 # Protein Structure Transformer
 
-The repository implements the Protein Structure Transformer (PST). The PST model extends the protein sequence model [ESM-2][6] to extract representations of protein structures. Full details of PST can be found in the paper [Protein Structure Transformer][1].
+The repository implements the Protein Structure Transformer (PST). The PST model extends the protein sequence model [ESM-2][6] to extract representations of protein structures. Full details of PST can be found in the [paper][1].
 
 ## Citation
 
@@ -15,7 +15,7 @@ Please use the following to cite our work:
 PST uses a structure extractor to incorporate protein structures into existing protein language models (PLMs) such as [ESM-2][6].
 The structure extractor adopts a GNN to extract subgraph representations of the 8Å-neighborhood protein structure graph at each residue (i.e., nodes on the graph). The resulting residue-level subgraph representations are then add to the $Q$, $K$ and $V$ matrices of **each** self-attention block of any (pretrained) transformer model (here we use **ESM-2**) pretrained on larger corpuses of sequences. We name the resulting model PST, which can be trained on any protein structure dataset, by either updating the full model weights or only the weights in the structure extractor. The pretraining dataset could be much smaller than the pretraining dataset of the base sequence model, e.g., SwissProt with only 550k protein structures. 
 
-Below you can find an overview of PST with ESM-2 as the sequence backbone. The ESM-2 model weights are frozen during the training of the structure extractor. The structure extractor was trained on AlphaFold SwissProt, a dataset of 550K proteins with predicted structures. The resulting PST model can then be finetuned on a downstream task, _e.g._, [torchdrug][5] or [proteinshake][4] tasks. PST can also be used to extract representations of protein structures.
+Below you can find an overview of PST with ESM-2 as the sequence backbone. The ESM-2 model weights are frozen during the training of the structure extractor. The structure extractor was trained on AlphaFold SwissProt, a dataset of 550K proteins with predicted structures. The resulting PST model can then be finetuned on a downstream task, e.g., [torchdrug][5] or [proteinshake][4] tasks. PST can also be used to extract representations of protein structures.
 
 ![Overview of PST](assets/overview.png)
 
