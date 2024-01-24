@@ -144,22 +144,22 @@ class PST(nn.Module):
     def from_pretrained_url(cls, model_name, model_path, train_struct_only=True, **kwargs):
         from .utils import download_url_content
         all_models = {
-            'esm2_t6_8M_UR50D': {
-                'train_struct_only': None,
-                'train_all': "https://datashare.biochem.mpg.de/s/ac9ufZ0NB2IrkZL/download",
+            "esm2_t6_8M_UR50D": {
+                "train_struct_only": "https://datashare.biochem.mpg.de/s/ARzKycmMQePvLXs/download",
+                "train_all": "https://datashare.biochem.mpg.de/s/ac9ufZ0NB2IrkZL/download",
             },
             "esm2_t12_35M_UR50D": {
-                'train_struct_only': None,
-                'train_all': "https://datashare.biochem.mpg.de/s/fOSIwJAIKLYjFe3/download",
+                "train_struct_only": "https://datashare.biochem.mpg.de/s/qRvDPTfExZkq38f/download",
+                "train_all": "https://datashare.biochem.mpg.de/s/fOSIwJAIKLYjFe3/download",
             },
             "esm2_t30_150M_UR50D": {
-                'train_struct_only': None,
-                'train_all': "https://datashare.biochem.mpg.de/s/a3yugJJMe0I0oEL/download",
+                "train_struct_only": "https://datashare.biochem.mpg.de/s/p73BABG81gZKElL/download",
+                "train_all": "https://datashare.biochem.mpg.de/s/a3yugJJMe0I0oEL/download",
             },
             "esm2_t33_650M_UR50D": {
-                'train_struct_only': None,
-                'train_all': "https://datashare.biochem.mpg.de/s/RpWYV4o4ka3gHvX/download",
-            }
+                "train_struct_only": "https://datashare.biochem.mpg.de/s/xGpS7sIG7k8DZX0/download",
+                "train_all": "https://datashare.biochem.mpg.de/s/RpWYV4o4ka3gHvX/download",
+            },
         }
         train_struct_only_key = 'train_struct_only' if train_struct_only else 'train_all'
         model_url = all_models[model_name][train_struct_only_key]

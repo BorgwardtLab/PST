@@ -21,11 +21,16 @@ Below you can find an overview of PST with ESM-2 as the sequence backbone. The E
 
 ## Pretrained models
 
-| Model name | #Layers | Embed dim | Train struct only | Model URL |
-|:-----------|:-------:|:---------:|:-----------------:|:---------:|
-| pst_t6     |    6    |    320    |       False       |   link    |
-| pst_t6_so  |    6    |    320    |       True        |   link    |
-
+| Model name | #Layers | Embed dim |       Notes       |                         Model URL                          |
+| :--------- | :-----: | :-------: | :---------------: | :--------------------------------------------------------: |
+| pst_t6     |    6    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/ac9ufZ0NB2IrkZL) |
+| pst_t6_so  |    6    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/ARzKycmMQePvLXs) |
+| pst_t12    |   12    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/fOSIwJAIKLYjFe3) |
+| pst_t12_so |   12    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/qRvDPTfExZkq38f) |
+| pst_t30    |   30    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/a3yugJJMe0I0oEL) |
+| pst_t30_so |   30    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/p73BABG81gZKElL) |
+| pst_t30    |   30    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/RpWYV4o4ka3gHvX) |
+| pst_t30_so |   30    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/xGpS7sIG7k8DZX0) |
 
 ## Usage
 
@@ -43,11 +48,11 @@ pip install proteinshake isort black fair-esm pyprojroot einops torch_geometric=
 
 ### Quick start: extract protein representations using PST
 
-To see how you can get better representations from your data using PST, see `./scripts/pst_inference.py` for more details.
+To see how you can get better, structure-aware representations from your data using PST, see `./scripts/pst_inference.py` for more details.
 
 ### Use PST for protein function prediction
 
-You can use PST to perform Gene Ontology prediction, Enzyme Commission prediction and any protein function prediction tasks.
+You can use PST to perform Gene Ontology prediction, Enzyme Commission prediction and any other protein function prediction tasks.
 
 #### Fixed representations
 
@@ -75,6 +80,9 @@ python train_pst.py base_model=esm2_t6 model.train_struct_only=true
 
 You can replace `esm2_t6` with `esm2_t12`, `esm2_t30`, `esm2_t33` or any pretrained ESM-2 model.
 
+### Reproducibility datasets
+
+We have folded structures that were not available in the PDB for our VEP datasets. You can download the dataset from [here](https://datashare.biochem.mpg.de/s/2UgA8kBwmCAVEsL), and unzip it in ./datasets, provided your current path is the root of this repository.
 
 
 [1]: https://arxiv.org/abs/TODO
