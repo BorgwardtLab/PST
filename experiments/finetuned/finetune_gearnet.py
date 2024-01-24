@@ -172,17 +172,20 @@ class ProteinTaskTrainer(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             [
-                {"params": self.model.base_model.parameters(), "lr": self.cfg.training.lr * 0.01},
-                {"params": self.model.head_parameters(), 'weight_decay': self.cfg.training.weight_decay},
+                {
+                    "params": self.model.base_model.parameters(),
+                    "lr": self.cfg.training.lr * 0.01,
+                },
+                {
+                    "params": self.model.head_parameters(),
+                    "weight_decay": self.cfg.training.weight_decay,
+                },
             ],
             lr=self.cfg.training.lr,
             # weight_decay=self.cfg.training.weight_decay,
         )
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode='max',
-            factor=0.5,
-            patience=4
+            optimizer, mode="max", factor=0.5, patience=4
         )
         return {
             "optimizer": optimizer,
@@ -208,15 +211,14 @@ def main(cfg):
 
     try:
         model, model_cfg = PST.from_pretrained_url(
-            cfg.model,
-            pretrained_path,
-            cfg.include_seq
+            cfg.model, pretrained_path, cfg.include_seq
         )
     except:
         model, model_cfg = PST.from_pretrained_url(
-            cfg.model, pretrained_path,
+            cfg.model,
+            pretrained_path,
             cfg.include_seq,
-            map_location=torch.device('cpu')
+            map_location=torch.device("cpu"),
         )
 
     task = core.Configurable.load_config_dict(

@@ -16,12 +16,7 @@ from tqdm import tqdm
 from sklearn.metrics import make_scorer
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 
-from pst.downstream import (
-    compute_metrics,
-    get_task, 
-    prepare_data,
-    mask_cls_idx
-)
+from pst.downstream import compute_metrics, get_task, prepare_data, mask_cls_idx
 from pst.esm2 import PST
 from pst.transforms import PretrainingAttr, Proteinshake2ESM
 from pst.downstream.sklearn_wrapper import SklearnPredictor
@@ -72,16 +67,14 @@ def main(cfg):
 
     try:
         model, model_cfg = PST.from_pretrained_url(
-            cfg.model,
-            pretrained_path,
-            cfg.struct_only
+            cfg.model, pretrained_path, cfg.struct_only
         )
     except:
         model, model_cfg = PST.from_pretrained_url(
             cfg.model,
             pretrained_path,
             cfg.struct_only,
-            map_location=torch.device('cpu')
+            map_location=torch.device("cpu"),
         )
 
     model.eval()

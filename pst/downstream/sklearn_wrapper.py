@@ -3,7 +3,11 @@ from collections import defaultdict
 from sklearn.base import BaseEstimator
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Ridge
-from sklearn.multioutput import MultiOutputClassifier, _available_if_estimator_has, ClassifierChain
+from sklearn.multioutput import (
+    MultiOutputClassifier,
+    _available_if_estimator_has,
+    ClassifierChain,
+)
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.parallel import Parallel, delayed
 from sklearn.utils.validation import _check_fit_params, has_fit_parameter
@@ -55,7 +59,13 @@ class MyMultiOutputClassifier(MultiOutputClassifier):
         else:
             self.estimators_ = Parallel(n_jobs=self.n_jobs)(
                 delayed(_fit_estimator)(
-                    self.estimator, X, y[:, i], sample_weight, X_val=X_val, y_val=y_val[:, i], **fit_params_validated
+                    self.estimator,
+                    X,
+                    y[:, i],
+                    sample_weight,
+                    X_val=X_val,
+                    y_val=y_val[:, i],
+                    **fit_params_validated,
                 )
                 for i in range(y.shape[1])
             )
@@ -129,9 +139,9 @@ class SklearnPredictor(BaseEstimator):
     def get_grid(self):
         grid = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0]
         if self.task_type == "regression":
-            grid = {'alpha': grid}
+            grid = {"alpha": grid}
         else:
-            grid = {'C': grid}
+            grid = {"C": grid}
 
         if self.task_type == "multi_label":
             grid = {f"estimator__{key}": value for key, value in grid.items()}

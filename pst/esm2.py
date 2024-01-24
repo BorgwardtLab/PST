@@ -13,7 +13,7 @@ class PST(nn.Module):
         num_layers=4,
         token_dropout=True,
         edge_dim=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -48,7 +48,7 @@ class PST(nn.Module):
                     4 * embed_dim,
                     use_rotary_embeddings=True,
                     use_edge_attr=use_edge_attr,
-                    **kwargs
+                    **kwargs,
                 )
                 for _ in range(num_layers)
             ]
@@ -141,8 +141,11 @@ class PST(nn.Module):
         return model, cfg
 
     @classmethod
-    def from_pretrained_url(cls, model_name, model_path, train_struct_only=True, **kwargs):
+    def from_pretrained_url(
+        cls, model_name, model_path, train_struct_only=True, **kwargs
+    ):
         from .utils import download_url_content
+
         all_models = {
             "esm2_t6_8M_UR50D": {
                 "train_struct_only": "https://datashare.biochem.mpg.de/s/ARzKycmMQePvLXs/download",
@@ -161,7 +164,9 @@ class PST(nn.Module):
                 "train_all": "https://datashare.biochem.mpg.de/s/RpWYV4o4ka3gHvX/download",
             },
         }
-        train_struct_only_key = 'train_struct_only' if train_struct_only else 'train_all'
+        train_struct_only_key = (
+            "train_struct_only" if train_struct_only else "train_all"
+        )
         model_url = all_models[model_name][train_struct_only_key]
         download_url_content(model_url, str(model_path))
         return cls.from_pretrained(model_path, **kwargs)
@@ -187,7 +192,9 @@ import torch_geometric.nn as gnn
 
 
 class ProteinNet(nn.Module):
-    def __init__(self, base_model, num_class, out_head="linear", aggr=None, dropout=0.5):
+    def __init__(
+        self, base_model, num_class, out_head="linear", aggr=None, dropout=0.5
+    ):
         super().__init__()
         self.base_model = base_model
         self.embed_dim = self.base_model.embed_dim
@@ -196,8 +203,7 @@ class ProteinNet(nn.Module):
 
         if out_head == "linear":
             self.out_head = nn.Sequential(
-                nn.Dropout(dropout),
-                nn.Linear(self.embed_dim, self.num_class)
+                nn.Dropout(dropout), nn.Linear(self.embed_dim, self.num_class)
             )
         else:
             self.out_head = nn.Sequential(
@@ -208,7 +214,7 @@ class ProteinNet(nn.Module):
                 nn.Linear(self.embed_dim // 2, self.embed_dim // 4),
                 nn.ReLU(True),
                 nn.Dropout(dropout),
-                nn.Linear(self.embed_dim // 4, self.num_class)
+                nn.Linear(self.embed_dim // 4, self.num_class),
             )
 
         self.aggr = aggr
@@ -226,7 +232,9 @@ class ProteinNet(nn.Module):
             import itertools
 
             return itertools.chain(
-                self.out_head.parameters(), self.norm.parameters(), self.lin_proj.parameters()
+                self.out_head.parameters(),
+                self.norm.parameters(),
+                self.lin_proj.parameters(),
             )
         else:
             return self.out_head.parameters()

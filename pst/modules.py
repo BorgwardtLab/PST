@@ -27,7 +27,7 @@ class MultiheadAttention(nn.Module):
         use_rotary_embeddings=True,
         gnn_type="gin",
         k_hop=2,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -217,7 +217,7 @@ class TransformerLayer(nn.Module):
         activation="gelu",
         gnn_type="gin",
         k_hop=2,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
 

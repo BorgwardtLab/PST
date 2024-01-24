@@ -109,15 +109,14 @@ def main(cfg):
 
     try:
         model, model_cfg = PST.from_pretrained_url(
-            cfg.model,
-            pretrained_path,
-            cfg.include_seq
+            cfg.model, pretrained_path, cfg.include_seq
         )
     except:
         model, model_cfg = PST.from_pretrained_url(
-            cfg.model, pretrained_path,
+            cfg.model,
+            pretrained_path,
             cfg.include_seq,
-            map_location=torch.device('cpu')
+            map_location=torch.device("cpu"),
         )
 
     model.eval()
