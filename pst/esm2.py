@@ -144,6 +144,7 @@ class PST(nn.Module):
     def from_pretrained_url(
         cls, model_name, model_path, train_struct_only=True, **kwargs
     ):
+        import os
         from .utils import download_url_content
         name_converter = {
             "pst_t6": ["esm2_t6_8M_UR50D", "train_all"],
@@ -177,10 +178,13 @@ class PST(nn.Module):
         train_struct_only_key = (
             "train_struct_only" if train_struct_only else "train_all"
         )
+        original_model_name = model_name
         if model_name.startswith("pst"):
             model_name, train_struct_only_key = name_converter[model_name]
         model_url = all_models[model_name][train_struct_only_key]
-        download_url_content(model_url, str(model_path))
+        if not os.path.isfile(str(model_path)):
+            print(f"Downloading {original_model_name} to {model_path}...")
+            download_url_content(model_url, str(model_path))
         return cls.from_pretrained(model_path, **kwargs)
 
 

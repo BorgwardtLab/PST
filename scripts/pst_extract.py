@@ -70,7 +70,7 @@ def compute_repr(data_loader, model, cfg):
 def main():
     cfg = parse_args()
 
-    pretrained_path = Path(f".cache/pretrained_models/{cfg.model}.pt")
+    pretrained_path = Path(f".cache/pst/{cfg.model}.pt")
     pretrained_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:

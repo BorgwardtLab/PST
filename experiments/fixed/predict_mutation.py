@@ -22,10 +22,10 @@ def load_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--pretrained_prefix", type=str, default=None, help="pretrained model path"
+        "--model-dir", type=str, default='.cache/pst', help="directory for downloading models"
     )
     parser.add_argument(
-        "--pretrained_name", type=str, default="model.pt", help="pretrained model name"
+        "--model", type=str, default='pst_t6', help="pretrained model names (see README for models)"
     )
     parser.add_argument(
         "--datapath", type=str, default="./datasets", help="dataset prefix"
@@ -130,9 +130,13 @@ def main():
     dataset = dataset_cls(root=cfg.datapath)
     mutations_list = dataset.mutations
 
-    model, model_cfg = PST.from_pretrained(
-        Path(cfg.pretrained_prefix) / cfg.pretrained_name
+    pretrained_path = Path(f"{cfg.model_dir}/{cfg.model}.pt")
+    pretrained_path.parent.mkdir(parents=True, exist_ok=True)
+
+    model, model_cfg = PST.from_pretrained_url(
+        cfg.model, pretrained_path
     )
+
     model.eval()
     model.to(cfg.device)
     dataset = dataset.to_graph(eps=model_cfg.data.graph_eps).pyg()
