@@ -18,7 +18,7 @@ from pst.transforms import MutationDataset
 
 def load_args():
     parser = argparse.ArgumentParser(
-        description="Use ESM2SAT for mutation prediction",
+        description="Use PST for mutation prediction",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -28,9 +28,8 @@ def load_args():
         "--model", type=str, default='pst_t6', help="pretrained model names (see README for models)"
     )
     parser.add_argument(
-        "--datapath", type=str, default="./datasets", help="dataset prefix"
+        "--datapath", type=str, default="./datasets/dms", help="dataset prefix"
     )
-    parser.add_argument("--dataset", type=str, default="dms", help="which dataset?")
     parser.add_argument(
         "--outdir", type=str, default="./logs_pst/dms", help="output directory",
     )
@@ -46,8 +45,8 @@ def load_args():
     )
     args = parser.parse_args()
 
-    args.datapath = Path(args.datapath) / args.dataset
-    args.log_path = Path(args.outdir)
+    args.datapath = Path(args.datapath)
+    args.outdir = Path(args.outdir)
 
     args.device = (
         torch.device(torch.cuda.current_device())
@@ -118,10 +117,7 @@ def main():
     cfg = load_args()
     print(cfg)
 
-    if cfg.dataset == "dms":
-        dataset_cls = DeepSequenceDataset
-    else:
-        raise ValueError("Not supported!")
+    dataset_cls = DeepSequenceDataset
 
     protein_ids = dataset_cls.available_ids()
     if isinstance(cfg.protein_id, list) and cfg.protein_id[0] != -1:
@@ -180,12 +176,11 @@ def main():
                 bias = probs.gather(-1, graph.x.cpu().view(-1, 1)).sum(dim=0)
                 results["y_score"] = results["y_score"] - bias
 
-            current_dir = cfg.log_path / f"{protein_id}"
-            print(current_dir)
+            current_dir = cfg.outdir / f"{protein_id}"
             os.makedirs(current_dir, exist_ok=True)
             torch.save(results, current_dir / "results.pt")
 
-            df["ESM2SAT"] = results["y_score"]
+            df["PST"] = results["y_score"]
         elif cfg.strategy == "wt":
             data_loader = DataLoader([graph], batch_size=1, shuffle=False)
             graph = next(iter(data_loader)).to(cfg.device)
@@ -193,7 +188,7 @@ def main():
                 out = model.mask_predict(graph)
                 probs = torch.log_softmax(out, dim=-1).cpu()
 
-            df["ESM2SAT"] = df.apply(
+            df["PST"] = df.apply(
                 lambda row: label_row_wt(
                     row["mutations"],
                     probs,
@@ -201,17 +196,17 @@ def main():
                 axis=1,
             )
 
-        rho = scipy.stats.spearmanr(df["effect"], df["ESM2SAT"])
-        print(f"Spearman: {rho}")
+        rho = scipy.stats.spearmanr(df["effect"], df["PST"])
+        print(f"Spearmanr: {rho}")
 
         all_scores.append(df)
         all_results["protein_id"].append(protein_id)
         all_results["spearmanr"].append(rho.correlation)
 
     all_results = pd.DataFrame.from_dict(all_results)
-    all_results.to_csv(cfg.log_path / "results.csv")
+    all_results.to_csv(cfg.outdir / "results.csv")
     all_scores = pd.concat(all_scores, ignore_index=True)
-    all_scores.to_csv(cfg.log_path / "scores.csv")
+    all_scores.to_csv(cfg.outdir / "scores.csv")
 
 
 if __name__ == "__main__":
