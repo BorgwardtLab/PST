@@ -6,8 +6,8 @@ data
 datasets/
 test
 cache
-experiments/0_lengths_datasets/lengths/
 pretrained
+scripts/examples/processed
 
 ### Hydra ###
 .hydra/

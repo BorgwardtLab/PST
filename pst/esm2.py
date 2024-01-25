@@ -145,6 +145,16 @@ class PST(nn.Module):
         cls, model_name, model_path, train_struct_only=True, **kwargs
     ):
         from .utils import download_url_content
+        name_converter = {
+            "pst_t6": ["esm2_t6_8M_UR50D", "train_all"],
+            "pst_t6_so": ["esm2_t6_8M_UR50D", "train_struct_only"],
+            "pst_t12": ["esm2_t12_35M_UR50D", "train_all"],
+            "pst_t12_so": ["esm2_t12_35M_UR50D", "train_struct_only"],
+            "pst_t30": ["esm2_t30_150M_UR50D", "train_all"],
+            "pst_t30_so": ["esm2_t30_150M_UR50D", "train_struct_only"],
+            "pst_t33": ["esm2_t33_650M_UR50D", "train_all"],
+            "pst_t33_so": ["esm2_t33_650M_UR50D", "train_struct_only"],
+        }
 
         all_models = {
             "esm2_t6_8M_UR50D": {
@@ -167,6 +177,8 @@ class PST(nn.Module):
         train_struct_only_key = (
             "train_struct_only" if train_struct_only else "train_all"
         )
+        if model_name.startswith("pst"):
+            model_name, train_struct_only_key = name_converter[model_name]
         model_url = all_models[model_name][train_struct_only_key]
         download_url_content(model_url, str(model_path))
         return cls.from_pretrained(model_path, **kwargs)
