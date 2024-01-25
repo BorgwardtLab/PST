@@ -136,6 +136,8 @@ def main(cfg):
         test_str, y_te = tmp["test_str"], tmp["y_te"]
         del tmp
     else:
+        # To make torchdrug work, one has to delete unrecognized attributes...
+        cfg.dataset.__delattr__('name')
         dataset = core.Configurable.load_config_dict(
             OmegaConf.to_container(cfg.dataset, resolve=True)
         )
