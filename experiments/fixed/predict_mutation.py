@@ -11,7 +11,7 @@ from proteinshake.utils import residue_alphabet
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
-from pst.data.mutation import DeepSequenceDataset
+from pst.downstream.mutation import DeepSequenceDataset
 from pst.esm2 import PST
 from pst.transforms import MutationDataset
 
@@ -32,6 +32,9 @@ def load_args():
     )
     parser.add_argument("--dataset", type=str, default="dms", help="which dataset?")
     parser.add_argument(
+        "--outdir", type=str, default="./logs_pst/dms", help="output directory",
+    )
+    parser.add_argument(
         "--protein_id", type=int, default=-1, nargs="+", help="protein id list"
     )
     parser.add_argument(
@@ -44,7 +47,7 @@ def load_args():
     args = parser.parse_args()
 
     args.datapath = Path(args.datapath) / args.dataset
-    args.log_path = Path(args.pretrained_prefix) / args.dataset
+    args.log_path = Path(args.outdir)
 
     args.device = (
         torch.device(torch.cuda.current_device())
