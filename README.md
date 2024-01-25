@@ -40,10 +40,10 @@ The dependencies are managed by [mamba][2]
 
 ```
 
-mamba create -n pst python=3.9 pytorch torchvision pytorch-cuda=12.1 pyg lightning nvitop pytorch-scatter -c pytorch -c nvidia -c pyg
+mamba create -n pst python=3.9 pytorch torchvision pytorch-cuda=12.1 pyg lightning nvitop pytorch-scatter pytorch-cluster -c pytorch -c nvidia -c pyg
 mamba activate pst
-pip install proteinshake isort black fair-esm[esmfold] pyprojroot einops torch_geometric==2.3.1 pandas easydict pyprojroot scikit-learn flaml
-
+pip install proteinshake isort black fair-esm[esmfold] pyprojroot einops torch_geometric==2.3.1 pandas easydict pyprojroot scikit-learn flaml hydra-core
+pip install -e .
 ```
 
 ### Quick start: extract protein representations using PST
