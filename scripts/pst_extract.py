@@ -10,7 +10,15 @@ from example_dataset import ExampleDataset
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Extract per-token representations for pdb files stored in datapath/raw"  # noqa
+        description="Use PST to extract per-token representations \
+        for pdb files stored in datadir/raw",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--datadir",
+        type=str,
+        default="./scripts/examples",
+        help="Path to the dataset, pdb files should be stored in datadir/raw/",
     )
     parser.add_argument(
         "--model",
@@ -49,6 +57,8 @@ def compute_repr(data_loader, model, cfg):
         out = model(data, return_repr=True, aggr=cfg.aggr)
         out, batch = out[data.idx_mask], data.batch[data.idx_mask]
         if cfg.include_seq:
+            if "so" not in cfg.model:
+                raise ValueError("Use models pretrained using struct only updates strategy!")
             data.edge_index = None
             out_seq = model(data, return_repr=True, aggr=cfg.aggr)
             out_seq = out_seq[data.idx_mask]
@@ -77,7 +87,7 @@ def main():
     model.to(cfg.device)
 
     dataset = ExampleDataset(
-        root="scripts/examples",
+        root=cfg.datadir,
     )
 
     data_loader = DataLoader(
@@ -89,6 +99,7 @@ def main():
     for protein_repr in protein_repr_all:
         print("Shape of representation (length, d_model):")
         print(protein_repr.shape)
+        print(protein_repr)
 
 
 if __name__ == "__main__":

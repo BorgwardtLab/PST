@@ -53,13 +53,24 @@ pip install torchdrug
 ```
 
 
-### Quick start: extract protein representations using PST
+### Quick start: extract representations of protein structures using PST
 
-To see how you can get better, structure-aware representations from your data using PST, see `./scripts/pst_inference.py` for more details.
+You can PST to simply extract representations of protein structures stored in PDB files. Just run
+
+```bash
+python scripts/pst_extract.py --help
+```
+
+If you want to work with your own dataset, just create a `my_dataset` directory in `scripts` and put all the PDB files into `my_dataset/raw/`,
+and run:
+
+```bash
+python scripts/pst_extract.py --datadir ./scripts/my_dataset --model pst_t33_so --include_seq
+```
 
 ### Use PST for protein function prediction
 
-You can use PST to perform Gene Ontology prediction, Enzyme Commission prediction and any other protein function prediction tasks.
+You can use PST to perform Gene Ontology prediction, Enzyme Commission Number prediction and any other protein function prediction tasks.
 
 #### Fixed representations
 
