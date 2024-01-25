@@ -17,7 +17,7 @@ import torch
 from esm import pretrained
 from tqdm import tqdm
 
-from pst.data.mutation import DeepSequenceDataset
+from pst.downstream.mutation import DeepSequenceDataset
 
 
 def remove_insertions(sequence: str) -> str:
@@ -45,7 +45,7 @@ def read_msa(filename: str, nseq: int) -> List[Tuple[str, str]]:
 
 
 def get_sequences():
-    with open("./dms_seq.json", "r") as f:
+    with open("./experiments/baselines/dms_seq.json", "r") as f:
         sequences = json.load(f)
     return pd.DataFrame(sequences["offset_list"])
 
@@ -72,7 +72,7 @@ def create_parser():
     parser.add_argument(
         "--dms-input",
         type=pathlib.Path,
-        default='../datasets/dms/raw/measurements.csv',
+        default='./datasets/dms/raw/measurements.csv',
         help="CSV file containing the deep mutational scan",
     )
     parser.add_argument(
@@ -84,7 +84,7 @@ def create_parser():
     parser.add_argument(
         "--dms-output",
         type=pathlib.Path,
-        default="./outputs/esm.csv",
+        default="./logs_esm/dms/esm.csv",
         help="Output file containing the deep mutational scan along with predictions",
     )
     parser.add_argument(
@@ -162,11 +162,8 @@ def compute_masked_marginals(
 
 def main(args):
     # Load the deep mutational scan
-    # df = pd.read_csv(args.dms_input)
-    # df = get_dms(args.protein_name, args.dms_input)
     df = pd.read_csv(args.dms_input)
     dms_seq = get_sequences()
-    print(dms_seq)
 
     protein_ids = DeepSequenceDataset.available_ids()
     if isinstance(args.protein_id, list) and args.protein_id[0] != -1:
@@ -192,7 +189,6 @@ def main(args):
             sequence = seq_df["wt_sequence"].iloc[0]
             offset_idx = seq_df["offset"].iloc[0]
             print(sequence)
-            print(offset_idx)
 
             data = [
                 ("protein1", sequence),
