@@ -1,0 +1,28 @@
+name: pst_repro
+channels:
+  - pyg
+  - pytorch
+  - nvidia
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.9 
+  - pytorch 
+  - pytorch-cuda=12.1 
+  - pyg 
+  - lightning 
+  - nvitop 
+  - pytorch-scatter 
+  - pytorch-cluster
+  - pip:
+      - proteinshake 
+      - fair-esm 
+      - pyprojroot 
+      - einops 
+      - torch_geometric==2.3.1 
+      - pandas 
+      - easydict 
+      - pyprojroot 
+      - scikit-learn
+      - hydra-core 
+      - tensorboard 

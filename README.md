@@ -39,10 +39,8 @@ Below you can find an overview of PST with ESM-2 as the sequence backbone. The E
 The dependencies are managed by [mamba][2]
 
 ```
-
-mamba create -n pst python=3.9 pytorch pytorch-cuda=12.1 pyg lightning nvitop pytorch-scatter pytorch-cluster -c pytorch -c nvidia -c pyg
+mamba env create -f environment.yaml 
 mamba activate pst
-pip install proteinshake fair-esm pyprojroot einops torch_geometric==2.3.1 pandas easydict pyprojroot scikit-learn hydra-core tensorboard
 pip install -e .
 ```
 
@@ -50,6 +48,14 @@ Optionally, you can install the following dependencies to run the experiments:
 
 ```
 pip install torchdrug
+```
+
+Finally, you can also directly install the dependencies from the `environment.yml` file:
+
+```
+mamba create -n pst python=3.9
+mamba env update -n pst --file environment.yaml
+pip install -e . 
 ```
 
 
