@@ -1,7 +1,9 @@
+import contextlib
 import math
 from typing import Any, Callable, Iterable, List, Optional
 
 import esm
+import joblib
 import requests
 import torch
 from joblib import Parallel, delayed
@@ -197,6 +199,30 @@ def flatten_lists(lists: List) -> List:
         else:
             continue
     return result
+
+
+@contextlib.contextmanager
+def tqdm_joblib(tqdm_object):
+    """Context manager to patch joblib to report into tqdm progress bar.
+
+    Code stolen from https://stackoverflow.com/a/58936697
+    """
+
+    class TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def __call__(self, *args, **kwargs):
+            tqdm_object.update(n=self.batch_size)
+            return super().__call__(*args, **kwargs)
+
+    old_batch_callback = joblib.parallel.BatchCompletionCallBack
+    joblib.parallel.BatchCompletionCallBack = TqdmBatchCompletionCallback
+    try:
+        yield tqdm_object
+    finally:
+        joblib.parallel.BatchCompletionCallBack = old_batch_callback
+        tqdm_object.close()
 
 
 def distribute_function(
