@@ -25,12 +25,12 @@ Below you can find an overview of PST with ESM-2 as the sequence backbone. The E
 | :--------- | :-----: | :-------: | :---------------: | :--------------------------------------------------------: |
 | pst_t6     |    6    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/ac9ufZ0NB2IrkZL) |
 | pst_t6_so  |    6    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/ARzKycmMQePvLXs) |
-| pst_t12    |   12    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/fOSIwJAIKLYjFe3) |
-| pst_t12_so |   12    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/qRvDPTfExZkq38f) |
-| pst_t30    |   30    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/a3yugJJMe0I0oEL) |
-| pst_t30_so |   30    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/p73BABG81gZKElL) |
-| pst_t30    |   30    |    320    |     Standard      | [link](https://datashare.biochem.mpg.de/s/RpWYV4o4ka3gHvX) |
-| pst_t30_so |   30    |    320    | Train struct only | [link](https://datashare.biochem.mpg.de/s/xGpS7sIG7k8DZX0) |
+| pst_t12    |   12    |    480    |     Standard      | [link](https://datashare.biochem.mpg.de/s/fOSIwJAIKLYjFe3) |
+| pst_t12_so |   12    |    480    | Train struct only | [link](https://datashare.biochem.mpg.de/s/qRvDPTfExZkq38f) |
+| pst_t30    |   30    |    640    |     Standard      | [link](https://datashare.biochem.mpg.de/s/a3yugJJMe0I0oEL) |
+| pst_t30_so |   30    |    640    | Train struct only | [link](https://datashare.biochem.mpg.de/s/p73BABG81gZKElL) |
+| pst_t33    |   33    |    1280    |     Standard      | [link](https://datashare.biochem.mpg.de/s/RpWYV4o4ka3gHvX) |
+| pst_t33_so |   33    |    1280    | Train struct only | [link](https://datashare.biochem.mpg.de/s/xGpS7sIG7k8DZX0) |
 
 ## Usage
 
