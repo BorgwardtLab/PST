@@ -91,24 +91,15 @@ def main(cfg):
     cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
     log.info(f"Configs:\n{OmegaConf.to_yaml(cfg)}")
 
-    if cfg.include_seq:
-        pretrained_path = Path(cfg.pretrained) / "pst_so.pt"
-    else:
-        pretrained_path = Path(cfg.pretrained) / "pst.pt"
+    if cfg.include_seq and "so" not in cfg.model:
+        cfg.model = f"{cfg.model}_so"
 
+    pretrained_path = Path(cfg.pretrained) / f"{cfg.model}.pt"
     pretrained_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        model, model_cfg = PST.from_pretrained_url(
-            cfg.model, pretrained_path, cfg.include_seq
-        )
-    except:
-        model, model_cfg = PST.from_pretrained_url(
-            cfg.model,
-            pretrained_path,
-            cfg.include_seq,
-            map_location=torch.device("cpu"),
-        )
+    model, model_cfg = PST.from_pretrained_url(
+        cfg.model, pretrained_path,
+    )
 
     model.eval()
     model.to(cfg.device)

@@ -17,7 +17,7 @@ task:
   metric: ['auprc@micro', 'f1_max']
 
 seed: 1234
-model: esm2_t6_8M_UR50D
+model: pst_t6
 use_edge_attr: false
 datapath: datasets
 nogpu: false
@@ -32,7 +32,7 @@ include_seq: false
 aggr: concat
 use_pca: null
 
-pretrained: pretrained/${model}
+pretrained: .cache/pst
 
 logs:
   prefix: logs_pst/gearnet_data

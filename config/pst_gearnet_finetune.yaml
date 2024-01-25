@@ -20,7 +20,7 @@ task:
 
 debug: false
 seed: 1234
-model: esm2_t6_8M_UR50D
+model: pst_t6
 use_edge_attr: false
 datapath: datasets
 metric: 'f1_max'
@@ -40,7 +40,7 @@ compute:
   num_workers: 8
   n_jobs: 10
 
-pretrained: pretrained/${model}
+pretrained: .cache/pst
 
 logs:
   prefix: logs_proteinshake/gearnet/finetune

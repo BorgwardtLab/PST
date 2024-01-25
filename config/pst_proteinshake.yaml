@@ -3,7 +3,7 @@ defaults:
   - task: enzyme_class
 
 seed: 1234
-model: esm2_t6_8M_UR50D
+model: pst_t6
 use_edge_attr: false
 datapath: datasets
 split: structure
@@ -14,9 +14,8 @@ device: null
 truncation_seq_length: 5000
 toks_per_batch: 4096
 include_seq: false
-struct_only: false
 
-pretrained: pretrained/${model}
+pretrained: .cache/pst
 
 logs:
   prefix: logs_pst/proteinshake
