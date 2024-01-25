@@ -42,7 +42,7 @@ The dependencies are managed by [mamba][2]
 
 mamba create -n pst python=3.9 pytorch pytorch-cuda=12.1 pyg lightning nvitop pytorch-scatter pytorch-cluster -c pytorch -c nvidia -c pyg
 mamba activate pst
-pip install proteinshake isort black fair-esm[esmfold] pyprojroot einops torch_geometric==2.3.1 pandas easydict pyprojroot scikit-learn flaml hydra-core tensorboard torchdrug
+pip install proteinshake fair-esm pyprojroot einops torch_geometric==2.3.1 pandas easydict pyprojroot scikit-learn hydra-core tensorboard torchdrug
 pip install -e .
 ```
 
@@ -82,7 +82,7 @@ You can replace `esm2_t6` with `esm2_t12`, `esm2_t30`, `esm2_t33` or any pretrai
 
 ### Reproducibility datasets
 
-We have folded structures that were not available in the PDB for our VEP datasets. You can download the dataset from [here](https://datashare.biochem.mpg.de/s/2UgA8kBwmCAVEsL), and unzip it in ./datasets, provided your current path is the root of this repository.
+We have folded structures that were not available in the PDB for our VEP datasets. You can download the dataset from [here](https://datashare.biochem.mpg.de/s/2UgA8kBwmCAVEsL), and unzip it in ./datasets, provided your current path is the root of this repository. Similarly, download the SCOP dataset [here](https://datashare.biochem.mpg.de/s/2yUwpK7pt2TMQ5E).
 
 
 [1]: https://arxiv.org/abs/TODO
