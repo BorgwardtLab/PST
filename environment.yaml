@@ -9,11 +9,11 @@ dependencies:
   - python=3.9
   - pytorch>=2.0.0
   - pytorch-cuda=11.8
-  - pyg 
   - lightning 
   - pytorch-scatter 
   - pytorch-cluster
   - pip:
+      - torch_geometric==2.3.1 
       - proteinshake 
       - fair-esm 
       - pyprojroot 
