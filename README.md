@@ -1,6 +1,6 @@
 # Protein Structure Transformer
 
-The repository implements the Protein Structure Transformer (PST). The PST model extends the protein sequence model [ESM-2][6] to extract representations of protein structures. Full details of PST can be found in the [paper][1].
+The repository implements the Protein Structure Transformer (PST). The PST model endows the pretrained protein sequence model [ESM-2][6] with structural knowledge, allowing for extracting representations of protein structures. Full details of PST can be found in the [paper][1].
 
 ## Citation
 
@@ -12,8 +12,8 @@ Please use the following to cite our work:
 
 ## Overview of PST
 
-PST uses a structure extractor to incorporate protein structures into existing protein language models (PLMs) such as [ESM-2][6].
-The structure extractor adopts a GNN to extract subgraph representations of the 8Å-neighborhood protein structure graph at each residue (i.e., nodes on the graph). The resulting residue-level subgraph representations are then add to the $Q$, $K$ and $V$ matrices of **each** self-attention block of any (pretrained) transformer model (here we use **ESM-2**) pretrained on larger corpuses of sequences. We name the resulting model PST, which can be trained on any protein structure dataset, by either updating the full model weights or only the weights in the structure extractor. The pretraining dataset could be much smaller than the pretraining dataset of the base sequence model, e.g., SwissProt with only 550k protein structures. 
+PST uses a structure extractor to incorporate protein structures into existing pretrained protein language models (PLMs) such as [ESM-2][6].
+The structure extractor adopts a GNN to extract subgraph representations of the 8Å-neighborhood protein structure graph at each residue (i.e., nodes on the graph). The resulting residue-level subgraph representations are then add to the $Q$, $K$ and $V$ matrices of **each** self-attention block of any (pretrained) transformer model (here we use **ESM-2**) pretrained on larger corpuses of sequences. We name the resulting model PST, which can be trained on any protein structure dataset, by either updating the full model weights or only the weights in the structure extractor. The pretraining dataset could be much smaller than the pretraining dataset used for the base sequence model, e.g., SwissProt with only 542k protein structures. 
 
 Below you can find an overview of PST with ESM-2 as the sequence backbone. The ESM-2 model weights were frozen during the training of the structure extractor. The structure extractor was trained on AlphaFold SwissProt, a dataset of 542K proteins with predicted structures. The resulting PST model can then be finetuned on a downstream task, e.g., [torchdrug][5] or [proteinshake][4] tasks. PST can also be used to simply extract representations of protein structures.
 
@@ -97,7 +97,7 @@ You can replace `esm2_t6` with `esm2_t12`, `esm2_t30`, `esm2_t33` or any pretrai
 
 ### Reproducibility datasets
 
-We have folded structures that were not available in the PDB for our VEP datasets. You can download the dataset from [here](https://datashare.biochem.mpg.de/s/2UgA8kBwmCAVEsL), and unzip it in ./datasets, provided your current path is the root of this repository. Similarly, download the SCOP dataset [here](https://datashare.biochem.mpg.de/s/2yUwpK7pt2TMQ5E).
+We have folded structures that were not available in the PDB for our VEP datasets. You can download the dataset from [here](https://datashare.biochem.mpg.de/s/2UgA8kBwmCAVEsL), and unzip it in `./datasets`, provided your current path is the root of this repository. Similarly, download the SCOP dataset [here](https://datashare.biochem.mpg.de/s/2yUwpK7pt2TMQ5E).
 
 
 [1]: https://arxiv.org/abs/TODO
