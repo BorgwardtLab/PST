@@ -21,7 +21,7 @@ Below you can find an overview of PST with ESM-2 as the sequence backbone. The E
 
 ## Pretrained models
 
-| Model name   | ESM-2 backbone        | #Layers | Embed dim | Notes             | Model URL                                                  |
+| Model name   | Sequence model        | #Layers | Embed dim | Notes             | Model URL                                                  |
 | ------------ | --------------------- | ------- | --------- | ----------------- | ---------------------------------------------------------- |
 | `pst_t6`     | `esm2_t6_8M_UR50D`    | 6       | 320       | Standard          | [link](https://datashare.biochem.mpg.de/s/ac9ufZ0NB2IrkZL) |
 | `pst_t6_so`  | `esm2_t6_8M_UR50D`    | 6       | 320       | Train struct only | [link](https://datashare.biochem.mpg.de/s/ARzKycmMQePvLXs) |
