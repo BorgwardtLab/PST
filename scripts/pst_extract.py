@@ -17,7 +17,7 @@ def parse_args():
     parser.add_argument(
         "--datadir",
         type=str,
-        default="./scripts/examples",
+        default="./scripts/example_data/",
         help="Path to the dataset, pdb files should be stored in datadir/raw/",
     )
     parser.add_argument(
