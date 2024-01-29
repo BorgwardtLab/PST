@@ -7,6 +7,14 @@ The repository implements the Protein Structure Transformer (PST). The PST model
 Please use the following to cite our work:
 
 ```bibtex
+@misc{chen2024endowing,
+	title={Endowing Protein Language Models with Structural Knowledge}, 
+	author={Dexiong Chen and Philip Hartout and Paolo Pellizzoni and Carlos Oliver and Karsten Borgwardt},
+	year={2024},
+	eprint={2401.14819},
+	archivePrefix={arXiv},
+	primaryClass={q-bio.QM}
+}
 ```
 
 
@@ -100,7 +108,7 @@ You can replace `esm2_t6` with `esm2_t12`, `esm2_t30`, `esm2_t33` or any pretrai
 We have folded structures that were not available in the PDB for our VEP datasets. You can download the dataset from [here](https://datashare.biochem.mpg.de/s/2UgA8kBwmCAVEsL), and unzip it in `./datasets`, provided your current path is the root of this repository. Similarly, download the SCOP dataset [here](https://datashare.biochem.mpg.de/s/2yUwpK7pt2TMQ5E).
 
 
-[1]: https://arxiv.org/abs/TODO
+[1]: https://arxiv.org/abs/2401.14819
 [2]: https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html
 [3]: https://arxiv.org/abs/2202.03036
 [4]: https://proteinshake.ai/
