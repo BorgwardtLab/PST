@@ -7,7 +7,7 @@ datasets/
 test
 cache
 pretrained
-scripts/examples/processed
+scripts/example_data/processed
 
 ### Hydra ###
 .hydra/
