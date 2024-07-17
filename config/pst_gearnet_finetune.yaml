@@ -39,6 +39,7 @@ compute:
   strategy: auto
   num_workers: 8
   n_jobs: 10
+  devices: auto
 
 pretrained: .cache/pst
 
