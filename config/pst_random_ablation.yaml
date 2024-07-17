@@ -1,0 +1,53 @@
+defaults:
+  - _self_
+  - training: default
+  - base_model: esm2_t6
+  - mode: default
+
+debug: false
+seed: 1234
+  
+data:
+  organism: swissprot
+  datapath: datasets/AlphaFold/${data.organism}
+  graph_eps: 8.0
+  crop_len: 1024
+  mask_rate: 0.15
+  val_datapath: datasets/dms
+  randomize_edges: true
+
+compute:
+  accelerator: gpu
+  precision: 16-mixed
+  strategy: ddp
+  num_workers: 8
+  n_jobs: 10
+
+logs:
+  prefix: logs_pst/random_ablation/randomized_${data.randomize_edges}
+  path: ${logs.prefix}/${model.name}/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  wandb: 
+    name: ${model.name}_randomize_${data.randomize_edges}
+    tags:
+      - random_ablation
+      - organism_${data.organism}
+      - model_${model.name}
+      - randomized_edges_${data.randomize_edges}
+    entity: "BorgwardtLab"
+    project: "PST"
+    save_dir: ${logs.path}
+  
+model:
+  k_hop: 2
+  train_struct_only: true
+  use_edge_attr: false
+  gnn_type: gin
+  edge_dim: null
+
+# output directory, generated dynamically on each run
+hydra:
+  run:
+    dir: ${logs.path}
+  sweep:
+    dir: ${logs.prefix}/${model.name}/multiruns/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

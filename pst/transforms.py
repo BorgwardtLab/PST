@@ -62,6 +62,19 @@ class RandomCrop(object):
                 data.residue_idx = data.residue_idx[node_mask]
         return data
 
+class RandomizeEdges(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, data):
+        edge_index = data.edge_index
+        perm = torch.randperm(edge_index.size(1))
+        edge_index = edge_index[:, perm]
+        data.edge_index = edge_index
+        if hasattr(data, "edge_attr"):
+            data.edge_attr = data.edge_attr[perm]
+        return data
+
 
 class MaskNode(object):
     def __init__(

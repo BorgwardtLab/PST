@@ -19,6 +19,7 @@ from pst.transforms import (
     PretrainingAttr,
     Proteinshake2ESM,
     RandomCrop,
+    RandomizeEdges,
 )
 from pst.utils import get_graph_from_ps_protein
 
@@ -35,6 +36,14 @@ def main(cfg):
         featurizer_fn = partial(
             get_graph_from_ps_protein, use_rbfs=True, eps=cfg.data.graph_eps
         )
+        transforms = [
+            RandomCrop(cfg.data.crop_len),
+            MaskNode(mask_rate=cfg.data.mask_rate),
+        ]
+        if cfg.data.randomize_edges:
+            # Add transforms to position 0 in list
+            transforms.append(RandomizeEdges())
+
         dataset = CustomGraphDataset(
             root=cfg.data.datapath,
             dataset=ps_dataset.AlphaFoldDataset(
@@ -42,10 +51,7 @@ def main(cfg):
             ),
             pre_transform=featurizer_fn,
             transform=Compose(
-                [
-                    RandomCrop(cfg.data.crop_len),
-                    MaskNode(mask_rate=cfg.data.mask_rate),
-                ]
+                transforms=transforms,
             ),
             n_jobs=cfg.compute.n_jobs,
         )
@@ -54,14 +60,19 @@ def main(cfg):
         dataset = datasets.AlphaFoldDataset(
             root=cfg.data.datapath, organism=cfg.data.organism
         )
+        transforms = [
+            PretrainingAttr(),
+            Proteinshake2ESM(),
+            RandomCrop(cfg.data.crop_len),
+            MaskNode(mask_rate=cfg.data.mask_rate),
+        ]
+        if cfg.data.randomize_edges:
+            # Add transforms to position 0 in list
+            transforms.append(RandomizeEdges())
+
         dataset = dataset.to_graph(eps=cfg.data.graph_eps).pyg(
             transform=Compose(
-                [
-                    PretrainingAttr(),
-                    Proteinshake2ESM(),
-                    RandomCrop(cfg.data.crop_len),
-                    MaskNode(mask_rate=cfg.data.mask_rate),
-                ]
+                transforms=transforms,
             )
         )
 
@@ -105,6 +116,13 @@ def main(cfg):
         logger=[
             pl.loggers.CSVLogger(cfg.logs.path, name="csv_logs"),
             pl.loggers.TensorBoardLogger(cfg.logs.path, name="tb_logs"),
+            pl.loggers.WandbLogger(
+                name=cfg.logs.wandb.name,
+                tags=cfg.logs.wandb.tags,
+                entity=cfg.logs.wandb.entity,
+                project=cfg.logs.wandb.project,
+                save_dir=cfg.logs.wandb.save_dir,
+            ),
         ],
         callbacks=[
             pl.callbacks.LearningRateMonitor(logging_interval="epoch"),
