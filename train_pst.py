@@ -131,7 +131,7 @@ def main(cfg):
         max_epochs=cfg.training.epochs,
         precision=cfg.compute.precision,
         accelerator=cfg.compute.accelerator,
-        devices="auto",
+        devices=cfg.compute.devices,
         strategy=cfg.compute.strategy,
         enable_checkpointing=True,
         default_root_dir=cfg.logs.path,
