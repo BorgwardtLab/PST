@@ -20,11 +20,29 @@ from pst.transforms import (
     Proteinshake2ESM,
     RandomCrop,
     RandomizeEdges,
+    SequenceEdges,
+    CompleteEdges,
 )
 from pst.utils import get_graph_from_ps_protein
 
 log = logging.getLogger(__name__)
 
+def get_loggers(cfg):
+    loggers = [
+    pl.loggers.CSVLogger(cfg.logs.path, name="csv_logs"),
+    pl.loggers.TensorBoardLogger(cfg.logs.path, name="tb_logs"),
+    ]
+    if cfg.logs.wandb.enable:
+        loggers.append(
+            pl.loggers.WandbLogger(
+            name=cfg.logs.wandb.name,
+            tags=cfg.logs.wandb.tags,
+            entity=cfg.logs.wandb.entity,
+            project=cfg.logs.wandb.project,
+            save_dir=cfg.logs.wandb.save_dir,
+            )
+        )
+    return loggers
 
 @hydra.main(
     version_base="1.3", config_path=str(here() / "config"), config_name="pst_pretrain"
@@ -40,10 +58,7 @@ def main(cfg):
             RandomCrop(cfg.data.crop_len),
             MaskNode(mask_rate=cfg.data.mask_rate),
         ]
-        if cfg.data.randomize_edges:
-            # Add transforms to position 0 in list
-            transforms.append(RandomizeEdges())
-
+     
         dataset = CustomGraphDataset(
             root=cfg.data.datapath,
             dataset=ps_dataset.AlphaFoldDataset(
@@ -66,9 +81,17 @@ def main(cfg):
             RandomCrop(cfg.data.crop_len),
             MaskNode(mask_rate=cfg.data.mask_rate),
         ]
-        if cfg.data.randomize_edges:
-            # Add transforms to position 0 in list
+        
+        if cfg.data.edge_perturb == "random":
             transforms.append(RandomizeEdges())
+        elif cfg.data.edge_perturb == "sequence":
+            transforms.append(SequenceEdges())
+        elif cfg.data.edge_perturb == "complete":
+            transforms.append(CompleteEdges())
+        elif cfg.data.edge_perturb is None:
+            pass
+        else:
+            raise ValueError("Invalid value for cfg.data.edge_perturb")
 
         dataset = dataset.to_graph(eps=cfg.data.graph_eps).pyg(
             transform=Compose(
@@ -84,7 +107,6 @@ def main(cfg):
         shuffle=True,
         num_workers=cfg.training.num_workers,
     )
-
     net = PST.from_model_name(
         cfg.model.name,
         k_hop=cfg.model.k_hop,
@@ -113,17 +135,7 @@ def main(cfg):
         strategy=cfg.compute.strategy,
         enable_checkpointing=True,
         default_root_dir=cfg.logs.path,
-        logger=[
-            pl.loggers.CSVLogger(cfg.logs.path, name="csv_logs"),
-            pl.loggers.TensorBoardLogger(cfg.logs.path, name="tb_logs"),
-            pl.loggers.WandbLogger(
-                name=cfg.logs.wandb.name,
-                tags=cfg.logs.wandb.tags,
-                entity=cfg.logs.wandb.entity,
-                project=cfg.logs.wandb.project,
-                save_dir=cfg.logs.wandb.save_dir,
-            ),
-        ],
+        logger=get_loggers(cfg),
         callbacks=[
             pl.callbacks.LearningRateMonitor(logging_interval="epoch"),
             pl.callbacks.RichProgressBar(),

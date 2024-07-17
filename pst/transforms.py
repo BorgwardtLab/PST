@@ -62,17 +62,47 @@ class RandomCrop(object):
                 data.residue_idx = data.residue_idx[node_mask]
         return data
 
+
 class RandomizeEdges(object):
-    def __init__(self):
-        pass
+    def __init__(self, seed=42):
+        self.seed = seed
 
     def __call__(self, data):
         edge_index = data.edge_index
+        torch.manual_seed(self.seed)
         perm = torch.randperm(edge_index.size(1))
         edge_index = edge_index[:, perm]
         data.edge_index = edge_index
         if hasattr(data, "edge_attr"):
             data.edge_attr = data.edge_attr[perm]
+        return data
+
+
+class CompleteEdges(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, data):
+        num_nodes = data.num_nodes
+        # Create complete graph without self loops but with reciprocal edges
+        edge_index = utils.to_undirected(
+            torch.combinations(torch.arange(num_nodes), 2).t()
+        )
+        data.edge_index = edge_index
+        return data
+
+
+class SequenceEdges(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, data):
+        num_nodes = data.num_nodes
+        # Create edges between consecutive nodes
+        edge_index = utils.to_undirected(
+            torch.stack([torch.arange(num_nodes - 1), torch.arange(1, num_nodes)])
+        )
+        data.edge_index = edge_index
         return data
 
 

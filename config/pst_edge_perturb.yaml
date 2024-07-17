@@ -14,7 +14,7 @@ data:
   crop_len: 1024
   mask_rate: 0.15
   val_datapath: datasets/dms
-  randomize_edges: true
+  edge_perturb: random
 
 compute:
   accelerator: gpu
@@ -24,15 +24,16 @@ compute:
   n_jobs: 10
 
 logs:
-  prefix: logs_pst/random_ablation/randomized_${data.randomize_edges}
+  prefix: logs_pst/random_ablation/edge_perturb_${data.edge_perturb}
   path: ${logs.prefix}/${model.name}/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
   wandb: 
-    name: ${model.name}_randomize_${data.randomize_edges}
+    enable: true
+    name: ${model.name}_edge_perturb_${data.edge_perturb}
     tags:
       - random_ablation
       - organism_${data.organism}
       - model_${model.name}
-      - randomized_edges_${data.randomize_edges}
+      - edge_perturb_${data.edge_perturb}
     entity: "BorgwardtLab"
     project: "PST"
     save_dir: ${logs.path}
