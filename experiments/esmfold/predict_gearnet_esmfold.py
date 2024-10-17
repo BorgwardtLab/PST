@@ -5,7 +5,9 @@ import pickle
 from pathlib import Path
 from timeit import default_timer as timer
 
+import biotite.structure as struc
 import esm
+import fastpdb
 import hydra
 import numpy as np
 import pandas as pd
@@ -15,6 +17,7 @@ import torchdrug
 from easydict import EasyDict as edict
 from omegaconf import OmegaConf
 from pyprojroot import here
+from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import radius_neighbors_graph
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
@@ -22,17 +25,41 @@ from torch_geometric.utils import from_scipy_sparse_matrix
 from torchdrug import core, datasets, models, tasks  # noqa
 from tqdm import tqdm
 
-from pst.esm2 import PST
-from pst.downstream.mlp import train_and_eval_mlp
 from pst.downstream import (
-    preprocess,
     convert_to_numpy,
     mask_cls_idx,
+    preprocess,
 )
+from pst.downstream.mlp import train_and_eval_mlp
+from pst.esm2 import PST
 
 log = logging.getLogger(__name__)
 
 esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
+
+AA_THREE_TO_ONE = {
+    "ALA": "A",
+    "CYS": "C",
+    "ASP": "D",
+    "GLU": "E",
+    "PHE": "F",
+    "GLY": "G",
+    "HIS": "H",
+    "ILE": "I",
+    "LYS": "K",
+    "LEU": "L",
+    "MET": "M",
+    "ASN": "N",
+    "PRO": "P",
+    "GLN": "Q",
+    "ARG": "R",
+    "SER": "S",
+    "THR": "T",
+    "VAL": "V",
+    "TRP": "W",
+    "TYR": "Y",
+    "UNK": "X",
+}
 
 
 @torch.no_grad()
@@ -57,44 +84,65 @@ def compute_repr(data_loader, model, cfg):
 
     return torch.cat(embeddings)
 
+def create_graph_from_pdb(idx, protein):
+    # Load the protein structure
+    pdb_file = fastpdb.PDBFile.read(here() / "datasets" / "esmfold" / "structures" / f"{idx}.pdb")
+    structure = pdb_file.get_structure(model=1) 
+    
+    coords = structure.coord
+    element = structure.element
+    resname = structure.res_name
+    resid = structure.res_id
+    chain_id = structure.chain_id
+    atom_name = structure.atom_name
+
+    df = pd.DataFrame(
+        {
+            "x": coords[:, 0],
+            "y": coords[:, 1],
+            "z": coords[:, 2],
+            "element": element,
+            "resname": resname,
+            "atom_name": atom_name,
+            "resid": resid,
+            "chain_id": chain_id,
+        }
+    )
+
+    # Extract CA atom coordinates
+    coordinates = df.loc[df["atom_name"] == "CA", ["x", "y", "z"]].values
+
+    sequence = "".join(
+        df.loc[df.atom_name == "CA"].resname.map(AA_THREE_TO_ONE).tolist()
+    )
+    x = torch.LongTensor(
+        [esm_alphabet.get_idx(res) for res in esm_alphabet.tokenize(sequence)]
+    )
+
+    # Create edge index and edge attributes
+    edge_index, edge_attr = from_scipy_sparse_matrix(
+        radius_neighbors_graph(coordinates, 8.0)
+    )
+    return Data(edge_index=edge_index, x=x, edge_attr=edge_attr)
 
 def get_structures(dataset, task, eps=8):
     data_loader = torchdrug.data.DataLoader(dataset, batch_size=1, shuffle=False)
     structures = []
     labels = []
-    for protein in tqdm(data_loader):
-        out = task.graph_construction_model(protein["graph"])
-        sequence = out.to_sequence()[0]
-        if len(sequence) == 0:
-            continue
-        coords = out.node_position
+    idx_range = dataset.indices
+    for idx, protein in tqdm(zip(idx_range, data_loader), total=len(list(idx_range)), desc="Get structures"):
+        graph = create_graph_from_pdb(idx, protein)
+        # x, edge_index, edge_attr = create_graph_from_contact_map()
         labels.append(protein["targets"])
-
-        torch_sequence = torch.LongTensor(
-            [esm_alphabet.get_idx(res) for res in esm_alphabet.tokenize(sequence)]
-        )
-        graph_adj = radius_neighbors_graph(coords, radius=eps, mode="connectivity")
-        edge_index = from_scipy_sparse_matrix(graph_adj)[0].long()
-        torch_sequence = torch.cat(
-            [
-                torch.LongTensor([esm_alphabet.cls_idx]),
-                torch_sequence,
-                torch.LongTensor([esm_alphabet.eos_idx]),
-            ]
-        )
-        edge_index = edge_index + 1  # shift for cls_idx
-
-        edge_attr = None
-
         structures.append(
-            Data(edge_index=edge_index, x=torch_sequence, edge_attr=edge_attr)
+            graph
         )
 
     return structures, torch.cat(labels)
 
 
 @hydra.main(
-    version_base="1.3", config_path=str(here() / "config"), config_name="pst_gearnet"
+    version_base="1.3", config_path=str(here() / "config"), config_name="pst_gearnet_esmfold"
 )
 def main(cfg):
     cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -118,7 +166,7 @@ def main(cfg):
     )
 
     structure_path = (
-        Path(cfg.dataset.path) / f"structures_{model_cfg.data.graph_eps}.pt"
+        Path(cfg.data.esmfold_structures_path) / f"structures_{model_cfg.data.graph_eps}.pt"
     )
     if structure_path.exists():
         tmp = torch.load(structure_path)

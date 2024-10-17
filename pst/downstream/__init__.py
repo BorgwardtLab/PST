@@ -1,8 +1,10 @@
-import torch
-import numpy as np
 import importlib
-from sklearn import metrics
+
+import numpy as np
+import torch
 from scipy.stats import spearmanr
+from sklearn import metrics
+from torch_geometric import utils
 
 
 def mask_cls_idx(data):
@@ -31,7 +33,7 @@ def get_task(task_name):
 
 def prepare_data(X, task, use_pca=False):
     train_idx, val_idx, test_idx = task.train_index, task.val_index, task.test_index
-    if not "pair" in task.task_type[0]:
+    if "pair" not in task.task_type[0]:
         y_tr = [task.target(task.proteins[idx]) for idx in train_idx]
         y_val = [task.target(task.proteins[idx]) for idx in val_idx]
         y_te = [task.target(task.proteins[idx]) for idx in test_idx]

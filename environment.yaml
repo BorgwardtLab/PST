@@ -12,6 +12,7 @@ dependencies:
   - lightning 
   - pytorch-scatter 
   - pytorch-cluster
+  - scikit-learn=1.3.2
   - pip:
       - torch_geometric==2.3.1 
       - proteinshake 
@@ -24,3 +25,4 @@ dependencies:
       - scikit-learn
       - hydra-core 
       - tensorboard 
+      - torchdrug

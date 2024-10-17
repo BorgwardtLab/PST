@@ -7,7 +7,6 @@ from .utils import (
     get_inverse_sqrt_schedule_with_warmup,
 )
 
-
 class BertTrainer(pl.LightningModule):
     def __init__(self, model, cfg, iterations):
         super().__init__()

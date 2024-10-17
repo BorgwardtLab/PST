@@ -27,6 +27,8 @@ from pst.utils import get_graph_from_ps_protein
 
 log = logging.getLogger(__name__)
 
+torch.set_float32_matmul_precision('medium')
+
 def get_loggers(cfg):
     loggers = [
     pl.loggers.CSVLogger(cfg.logs.path, name="csv_logs"),

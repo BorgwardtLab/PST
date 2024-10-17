@@ -1,0 +1,27 @@
+# @package hydra.launcher
+_target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
+
+# SLURM queue parameters
+# partition: p.hpcl8
+partition: p.hpcl91
+# partition: p.hpcl91
+
+# Job resource requirements
+timeout_min: 14_400
+cpus_per_task: 12
+gpus_per_node: 1
+gpus_per_task: 1
+tasks_per_node: 1
+mem_per_cpu: 2g
+nodes: 1
+exclude: hpcl9101
+
+# Job naming and output
+name: "pst"
+submitit_folder: ./logs/submitit/%j
+
+# Additional settings
+signal_delay_s: 5
+max_num_timeout: 0
+additional_parameters: {}
+array_parallelism: 30

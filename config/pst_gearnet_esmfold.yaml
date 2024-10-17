@@ -18,6 +18,7 @@ task:
 
 data: 
   edge_perturb: null
+  esmfold_structures_path: datasets/esmfold/structures/
 
 seed: 1234
 model: pst_t6

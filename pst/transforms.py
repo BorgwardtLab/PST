@@ -70,11 +70,11 @@ class RandomizeEdges(object):
     def __call__(self, data):
         edge_index = data.edge_index
         torch.manual_seed(self.seed)
-        perm = torch.randperm(edge_index.size(1))
-        edge_index = edge_index[:, perm]
+        perm_1 = torch.randperm(edge_index.size(1))
+        perm_2 = torch.randperm(edge_index.size(1))
+        edge_index[0,:] = edge_index[0, perm_1]
+        edge_index[1,:] = edge_index[1, perm_2]
         data.edge_index = edge_index
-        if hasattr(data, "edge_attr"):
-            data.edge_attr = data.edge_attr[perm]
         return data
 
 
@@ -146,8 +146,8 @@ class MutationDataset(object):
         mask_idx=esm_alphabet.mask_idx,
         strategy="masked",
         use_transform=True,
+        transform=None,
     ):
-        transform = Proteinshake2ESM()
         if use_transform:
             self.graph = transform(graph)
         else:

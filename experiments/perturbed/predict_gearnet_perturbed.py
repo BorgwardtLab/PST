@@ -20,7 +20,7 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import from_scipy_sparse_matrix
 from torchdrug import core, datasets, models, tasks  # noqa
-from tqdm import tqdm
+from tqdm.rich import tqdm
 
 from pst.esm2 import PST
 from pst.downstream.mlp import train_and_eval_mlp
@@ -29,6 +29,8 @@ from pst.downstream import (
     convert_to_numpy,
     mask_cls_idx,
 )
+from pst.transforms import RandomizeEdges, SequenceEdges, CompleteEdges
+from proteinshake.transforms import Compose
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ esm_alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
 @torch.no_grad()
 def compute_repr(data_loader, model, cfg):
     embeddings = []
-    for batch_idx, data in enumerate(tqdm(data_loader, desc="Computing embeddings")):
+    for batch_idx, data in enumerate(tqdm(data_loader)):
         data = data.to(cfg.device)
         out = model(data, return_repr=True, aggr=cfg.aggr)
         out, batch = out[data.idx_mask], data.batch[data.idx_mask]
@@ -103,12 +105,18 @@ def main(cfg):
     if cfg.include_seq and "so" not in cfg.model:
         cfg.model = f"{cfg.model}_so"
 
-    pretrained_path = Path(cfg.pretrained) / f"{cfg.model}.pt"
-    pretrained_path.parent.mkdir(parents=True, exist_ok=True)
-
-    model, model_cfg = PST.from_pretrained_url(
-        cfg.model, pretrained_path,
-    )
+    
+    if cfg.data.edge_perturb is not None:
+        pretrained_path = cfg.pretrained
+        model, model_cfg = PST.from_pretrained(
+            model_path=pretrained_path,
+        )
+    else:
+        pretrained_path = Path(cfg.pretrained) / f"{cfg.model}.pt"
+        pretrained_path.parent.mkdir(parents=True, exist_ok=True)
+        model, model_cfg = PST.from_pretrained_url(
+            cfg.model, pretrained_path,
+        )
 
     model.eval()
     model.to(cfg.device)
@@ -153,6 +161,24 @@ def main(cfg):
     train_str = [mask_cls_idx(data) for data in train_str]
     val_str = [mask_cls_idx(data) for data in val_str]
     test_str = [mask_cls_idx(data) for data in test_str]
+
+    if cfg.data.edge_perturb == "random":
+        PerturbationTransform = RandomizeEdges
+    elif cfg.data.edge_perturb == "sequence":
+        PerturbationTransform = SequenceEdges
+    elif cfg.data.edge_perturb == "complete":
+        PerturbationTransform = CompleteEdges
+    elif cfg.data.edge_perturb is None:
+        pass
+    else:
+        raise ValueError("Invalid value for cfg.data.edge_perturb")
+
+    if cfg.data.edge_perturb is not None:
+        train_str = [PerturbationTransform()(data) for data in tqdm(train_str, desc=f"Apply {cfg.data.edge_perturb} to train")]
+        val_str = [PerturbationTransform()(data) for data in tqdm(val_str, desc=f"Apply {cfg.data.edge_perturb} to val")]
+        test_str = [PerturbationTransform()(data) for data in tqdm(test_str, desc=f"Apply {cfg.data.edge_perturb} to test")]
+    else:
+        pass
 
     train_loader = DataLoader(
         train_str,

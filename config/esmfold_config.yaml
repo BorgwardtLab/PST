@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - dataset: gearnet_ec
-
+    
 task:
   class: MultipleBinaryClassification
   model:
@@ -15,9 +15,21 @@ task:
   criterion: bce
   num_mlp_layer: 0
   metric: ['auprc@micro', 'f1_max']
+  
+compute:
+  array_parallelism: 10
+  cpus_per_task: 5
+  mem_per_cpu: 2g
+  timeout_min: 1440
+  job_name: esmfold
+  partition: p.hpcl94g
+  gpus_per_node: 1
+  gpus_per_task: 1
+  tasks_per_node: 1
 
-data: 
-  edge_perturb: null
+data:
+  batch_size: 20
+  fold_batch_size: 10
 
 seed: 1234
 model: pst_t6
@@ -34,7 +46,7 @@ toks_per_batch: 4096
 include_seq: false
 aggr: concat
 use_pca: null
-
+parallel: false
 pretrained: .cache/pst
 
 logs:

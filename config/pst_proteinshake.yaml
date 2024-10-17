@@ -10,16 +10,16 @@ split: structure
 batch_size: 4
 num_workers: 4
 device: null
-
 truncation_seq_length: 5000
 toks_per_batch: 4096
 include_seq: false
-
 pretrained: .cache/pst
+perturbation: null
+model_path: null
 
 logs:
   prefix: logs_pst/proteinshake
-  path: ${logs.prefix}/${task.name}/${model}/${split}/${seed}
+  path: ${logs.prefix}/${task.name}/${model}/${split}/${seed}/${perturbation}
 
 # output directory, generated dynamically on each run
 hydra:
